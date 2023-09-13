@@ -16,25 +16,18 @@
  * Contributors:
  * 	Eduardo Iglesias Taylor - initial API and implementation
  *******************************************************************************/
-package org.platkmframework.core.request.exception;
+package org.platkmframework.core.scheduler;
 
-import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.util.error.annotations.ResponseStatus;
+public class SchedulerException extends Exception {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 3770991217679906792L;
 
-/**
- *   Author: 
- *     Eduardo Iglesias
- *   Contributors: 
- *   	Eduardo Iglesias - initial API and implementation
- **/
-@ResponseStatus(status = HttpStatus.BAD_REQUEST_400)
-public class UnKnowProcessRequestException extends Exception {
- 
-	private static final long serialVersionUID = 1L;
-  
-	public UnKnowProcessRequestException(String message) {
-		super(message); 
+	public SchedulerException(String message) {
+		super(message);
 	}
-	 
+
+	
 }

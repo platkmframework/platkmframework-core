@@ -16,25 +16,22 @@
  * Contributors:
  * 	Eduardo Iglesias Taylor - initial API and implementation
  *******************************************************************************/
-package org.platkmframework.core.request.exception;
+package org.platkmframework.core.rmi;
 
-import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.util.error.annotations.ResponseStatus;
+public class RMIException extends Exception {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -2752726884281827111L;
 
-/**
- *   Author: 
- *     Eduardo Iglesias
- *   Contributors: 
- *   	Eduardo Iglesias - initial API and implementation
- **/
-@ResponseStatus(status = HttpStatus.BAD_REQUEST_400)
-public class UnKnowProcessRequestException extends Exception {
- 
-	private static final long serialVersionUID = 1L;
-  
-	public UnKnowProcessRequestException(String message) {
-		super(message); 
+	public RMIException(String message) {
+		super(message);
 	}
-	 
+
+	public RMIException(Throwable cause) {
+		super(cause);
+	}
+
+	
 }
