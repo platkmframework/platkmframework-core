@@ -2,7 +2,23 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.platkmframework</groupId>
   <artifactId>platkmframework-core</artifactId>
-  <version>0.1.0-alpha</version>
+  <version>1.0.0-beta</version>
+ 
+  	<distributionManagement>
+		<repository>
+			<id>platkmframework</id>
+			<name>Releases</name>
+			<url>https://nexus.platkmframework.io/repository/platkmframework-releases/</url>
+		</repository>
+	 
+		<snapshotRepository>
+			<id>platkmframework</id>
+			<name>Snapshot</name>
+			<url>https://nexus.platkmframework.io/repository/platkmframework-snapshot/</url>
+		</snapshotRepository>
+	
+	</distributionManagement>
+	
   <build>
     <plugins>
       <plugin>
@@ -36,27 +52,32 @@
   	<dependency>
 		<groupId>org.platkmframework</groupId>
 		<artifactId>platkmframework-common-service</artifactId>
-		<version>0.1.0-alpha</version>
+		<version>1.0.0-beta</version>
+	</dependency>
+  	<dependency>
+		<groupId>org.platkmframework</groupId>
+		<artifactId>platkmframework-security-impl</artifactId>
+		<version>1.0.0-beta</version>
 	</dependency>
   	<dependency>
 		<groupId>org.platkmframework</groupId>
 		<artifactId>platkmframework-jpa</artifactId>
-		<version>0.1.0-alpha</version>
+		<version>1.0.0-beta</version>
 	</dependency>
 	<dependency>
 		<groupId>org.platkmframework</groupId>
 		<artifactId>platkmframework-util</artifactId>
-		<version>0.1.0-alpha</version>
+		<version>1.0.0-beta</version>
 	</dependency>
 	<dependency>
 		<groupId>org.platkmframework</groupId>
 		<artifactId>platkmframework-annotation</artifactId>
-		<version>0.1.0-alpha</version>
+		<version>1.0.0-beta</version>
 	</dependency>
 	<dependency>
 		<groupId>org.platkmframework</groupId>
 		<artifactId>platkmframework-content</artifactId>
-		<version>0.1.0-alpha</version>
+		<version>1.0.0-beta</version>
 	</dependency>
 	<dependency>
 	    <groupId>org.eclipse.jetty</groupId>
@@ -167,5 +188,10 @@
 	    <artifactId>jackson-module-parameter-names</artifactId>
 	    <version>2.14.2</version>
 	</dependency>	
+	<dependency>
+	    <groupId>jakarta.validation</groupId>
+	    <artifactId>jakarta.validation-api</artifactId>
+	    <version>3.0.2</version>
+	</dependency>
   </dependencies>
 </project>

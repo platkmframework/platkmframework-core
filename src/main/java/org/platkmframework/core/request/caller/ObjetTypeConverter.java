@@ -28,15 +28,24 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList; 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
- 
- 
+
+import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.lang3.StringUtils;
+import org.platkmframework.annotation.UIFilterToSearchConverter;
+import org.platkmframework.annotation.exception.UIFilterToSearchConverterException;
+import org.platkmframework.common.domain.filter.criteria.FilterCriteria;
+import org.platkmframework.common.domain.filter.criteria.SearchCriteria;
+import org.platkmframework.common.domain.filter.criteria.WhereCriteria;
+import org.platkmframework.common.domain.filter.ui.Filter;
+import org.platkmframework.comon.service.exception.ServiceException;
+import org.platkmframework.comon.service.validator.ValidatorUtil;
 import org.platkmframework.content.ioc.ObjectContainer;
+import org.platkmframework.core.domain.base.converter.UIFilterToSearchCriteriaConverter;
 import org.platkmframework.core.request.exception.ResourceNotFoundException;
 import org.platkmframework.core.request.multipart.MultiPart;
 import org.platkmframework.util.JsonException;
@@ -71,6 +80,8 @@ public class ObjetTypeConverter
 	public static final String C_TABLE_NEW_ROW_CHECKER 	= "html.table.newrow_checker";
 	
 	private static Map<String, Class<?>> primitive = new HashMap<>();
+	private static UIFilterToSearchCriteriaConverter uiFilterToSearchCriteriaConverter = new UIFilterToSearchCriteriaConverter();
+	
 	static {
 		primitive.put("byte", Byte.class);
 		primitive.put("short", Short.class);
@@ -81,6 +92,7 @@ public class ObjetTypeConverter
 		primitive.put("boolean", Boolean.class);
 		primitive.put("char", Character.class);
 	}
+	 
 	
 	/**
 	 * type
@@ -104,18 +116,19 @@ public class ObjetTypeConverter
 	 * @throws JsonException 
 	 * @throws InvocationException 
 	 * @throws ServletException 
+	 * @throws ServiceException 
 	 * @throws FileUploadException 
 	 */
-	public static Object converParamValueToObjectType(String customParamName,boolean required, Parameter parameter,
+	public static Object converParamValueToObjectType(String customParamName, boolean required, Parameter parameter,
 			HttpServletRequest req,
-			boolean isAttribute) throws ParseException, ResourceNotFoundException, IOException, JsonException, InvocationException, ServletException 
+			boolean isAttribute, Object paramValue) throws ParseException, ResourceNotFoundException, IOException, JsonException, InvocationException, ServletException, ServiceException 
 	{ 
 		if(parameter.getType().getName().startsWith("java.lang"))
-			return convertToJavaLang(parameter.getType(),req.getParameter(customParamName), required);
+			return convertToJavaLang(customParamName, parameter.getType(), paramValue, required);
 		else if(isPrimitive(parameter.getType().getName()))
-			return convertToJavaLang(primitive.get(parameter.getType().getName()),req.getParameter(customParamName), required);
+			return convertToJavaLang(customParamName, primitive.get(parameter.getType().getName()), paramValue, required);
 		else if( parameter.getType().getName().startsWith("java.time"))
-			return covertToTimeObject(parameter.getType(),req.getParameter(customParamName), required);
+			return covertToTimeObject(parameter.getType(), paramValue, required);
 		else if( parameter.getType().equals(MultiPart.class)) 
 			return MultiparReader.read(req);else
 		{
@@ -149,27 +162,60 @@ public class ObjetTypeConverter
 		throw new ResourceNotFoundException(type.getName() +  " not implemented"); 
 	}
 
-	public static Object converBodyValueToObjectType(Parameter parameter, boolean required, HttpServletRequest req) throws ResourceNotFoundException, IOException, ParseException, JsonException, ServletException {
+	public static Object converBodyValueToObjectType(Parameter parameter, boolean required, Class<? extends UIFilterToSearchConverter> uiFilterToSearchConverter, HttpServletRequest req) throws ResourceNotFoundException, IOException, ParseException, JsonException, ServletException, ServiceException {
 		  
 		if( parameter.getType().equals(MultiPart.class)) 
 			return MultiparReader.read(req);
 		else
 		{
 			String strBody = Util.inputSteamToString(req.getInputStream());
-			if(strBody == null || "".equals(strBody.trim()))
-				if(required)
-					throw new ResourceNotFoundException("required field value not found");
-				else return null;
+			if(StringUtils.isBlank(strBody))
+				if(required) throw new ResourceNotFoundException("required field value not found"); else return null;
+			
+			if(uiFilterToSearchConverter != null) {
+				UIFilterToSearchConverter uIFilterToSearchConverter =(UIFilterToSearchConverter) ObjectContainer.instance().geApptScopeObj(uiFilterToSearchConverter);
+				 try {
+					
+					 return uIFilterToSearchConverter.convert(strBody, parameter);
+				
+				 } catch (UIFilterToSearchConverterException e) {
+					 throw new ServiceException(e.getMessage());
+				}
+			}
 			
 			if(parameter.getType().equals(List.class) && parameter.getParameterizedType() instanceof ParameterizedType
-					&& ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments().length>0)
+					&& ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments().length>0) {
 			
 				return JsonUtil.jsonToListObject(strBody, (Class) ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments()[0]);
 			
-			if(parameter.getType().getName().startsWith("java.lang"))
-				return convertToJavaLang(parameter.getType(),strBody, required);
+			}else if(parameter.getType().equals(SearchCriteria.class)){
+				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+				ValidatorUtil.checkValidation(filter);
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToSearchCriteria(filter, filter.getCode());
+				ValidatorUtil.checkValidation(objBean);
+				return objBean;
+			
+			}else if(parameter.getType().equals(FilterCriteria.class)){
+				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+				ValidatorUtil.checkValidation(filter);
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToFilterCriteria(filter, filter.getCode());
+				ValidatorUtil.checkValidation(objBean);
+				return objBean;
+			
+			}else if(parameter.getType().equals(WhereCriteria.class)){
+				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+				ValidatorUtil.checkValidation(filter);
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToQueryCriteria(filter, filter.getCode());
+				ValidatorUtil.checkValidation(objBean);
+				return objBean;
+			
+			}else if(parameter.getType().getName().startsWith("java.lang"))
+				return convertToJavaLang(parameter.getName(), parameter.getType(), strBody, required);
+			
 			else {
-				return  JsonUtil.jsonToObject(strBody,parameter.getType());
+				Object objBean = JsonUtil.jsonToObject(strBody, parameter.getType());
+				ValidatorUtil.checkValidation(objBean);
+				return objBean;
 			}
 		}
 	}
@@ -187,15 +233,16 @@ public class ObjetTypeConverter
 	 * @throws IOException
 	 * @throws JsonException
 	 * @throws InvocationException
+	 * @throws ServiceException 
 	 */
 	public static  void converFieldValueToObjectType(String htmlFieldName,Field field, Object obj,
 							Map<String, Object> param,
 							HttpServletRequest req) throws ParseException, ResourceNotFoundException, 
-														   IOException, JsonException, InvocationException 
+														   IOException, JsonException, InvocationException, ServiceException 
 	{ 
 		if(field.getType().getName().startsWith("java.lang"))
 		{
-			Object value = convertToJavaLang(field.getType(),param.get(htmlFieldName),false);
+			Object value = convertToJavaLang(htmlFieldName, field.getType(),param.get(htmlFieldName),false);
 			ReflectionUtil.setAttributeValue(obj, field, value, false);
 		}
 		else
@@ -216,12 +263,12 @@ public class ObjetTypeConverter
 	 * @throws ParseException 
 	 * @throws ResourceNotFoundException 
 	 */
-	private static Object convertToJavaLang(Class<?> type, Object value, boolean required) throws ParseException, ResourceNotFoundException 
+	private static Object convertToJavaLang(String customParamName, Class<?> type, Object value, boolean required) throws ParseException, ResourceNotFoundException, ServiceException 
 	{
 		//if empty value
 		if( value == null || StringUtils.isEmpty(value.toString()) )
 		  if(required)
-			  throw new ResourceNotFoundException("required  field value not found -> " + type.toString());
+			  throw new ResourceNotFoundException("El valor para el parámetro " + customParamName + "es requerido");
 		  else
 			  return null;
 	
@@ -259,12 +306,13 @@ public class ObjetTypeConverter
 	 * @throws ResourceNotFoundException 
 	 * @throws ParseException 
 	 * @throws InvocationException 
+	 * @throws ServiceException 
 	 */
 	private static  List _processAttributeList(String htmlFieldName,
 								Object obj,
 								Field field,
 								Map<String, Object> param, 
-								HttpServletRequest req) throws ResourceNotFoundException, ParseException, InvocationException 
+								HttpServletRequest req) throws ResourceNotFoundException, ParseException, InvocationException, ServiceException 
 	{
 	 	
 		Type t = field.getType().getGenericSuperclass();
@@ -318,8 +366,9 @@ public class ObjetTypeConverter
 	 * @throws InvocationException 
 	 * @throws ResourceNotFoundException 
 	 * @throws ParseException 
+	 * @throws ServiceException 
 	 */	
-	private static List _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws InvocationException, ParseException, ResourceNotFoundException 
+	private static List _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws InvocationException, ParseException, ResourceNotFoundException, ServiceException 
 	{
 		List  list = (List )ReflectionUtil.getAttributeValue(obj, field);
 		List<Field> fields = ReflectionUtil.getAllFieldHeritage(obj.getClass());
@@ -352,7 +401,7 @@ public class ObjetTypeConverter
 					htmlFielNameId = _getTableCellName(htmlFieldName, fields.get(i+1).getName(), row);
 					if (req.getParameterMap().containsKey(htmlFielNameId))
 					{
-						value = convertToJavaLang(fields.get(i+1).getType(), req.getParameter(htmlFielNameId), false);
+						value = convertToJavaLang(htmlFielNameId, fields.get(i+1).getType(), req.getParameter(htmlFielNameId), false);
 						ReflectionUtil.setAttributeValue(objRow, fields.get(i+1), value, false);
 					}
 				}

@@ -18,8 +18,6 @@
  *******************************************************************************/
 package org.platkmframework.core.domain.base.converter;
   
-import org.platkmframework.annotation.AutoWired;
-import org.platkmframework.annotation.Service;
 import org.platkmframework.common.domain.filter.criteria.CriteriaBase;
 import org.platkmframework.common.domain.filter.criteria.CriteriaFunction;
 import org.platkmframework.common.domain.filter.criteria.FilterCriteria;
@@ -28,9 +26,6 @@ import org.platkmframework.common.domain.filter.criteria.WhereCriteria;
 import org.platkmframework.common.domain.filter.enumerator.SqlOrder;
 import org.platkmframework.common.domain.filter.ui.Filter;
 import org.platkmframework.comon.service.exception.ServiceException;
-import org.platkmframework.database.manager.processor.util.DaoUtil; 
-
-
 
 /**
  *   Author: 
@@ -38,74 +33,47 @@ import org.platkmframework.database.manager.processor.util.DaoUtil;
  *   Contributors: 
  *   	Eduardo Iglesias - initial API and implementation
  **/
-	@Service  
-	public class UIFilterToSearchCriteriaConverter extends BaseFilterToFindFilterConverter {
-	 
-	@AutoWired
-	private SearhCriteriaVOConverter searhCriteriaVOConverter;
+	
+	public class UIFilterToSearchCriteriaConverter extends BaseFilterToFindFilterConverter implements FilterToFindFilterConverter{
+	  
  
- 
-	public SearchCriteria convertToSearchCriteria(Filter filter) throws ServiceException { 
+    @Override
+	public SearchCriteria convertToSearchCriteria(Filter<?> filter, String searchMapCode) throws ServiceException { 
 		
 		SearchCriteria searchCriteria = new SearchCriteria(); 
-		ConverterResultData converterResultData =  this.convert(filter, searchCriteria, null ); 
+		ConverterResultData converterResultData =  this.convert(filter, searchCriteria,searchMapCode); 
 		searchCriteria.select(converterResultData.getSelect());
 		searchCriteria.groupBy(converterResultData.getGroupBy());
 		searchCriteria.having(converterResultData.getHaving());
-		updateAdditionals(searchCriteria, filter);
+		updateAdditionals(searchCriteria, filter, converterResultData);
+		searchCriteria.setCode(searchMapCode);
 		
 		return searchCriteria;
 	}
 	
-	public FilterCriteria convertToFilterCriteria(Filter filter,  Class<?>  entityClass) throws ServiceException {
+    @Override
+	public FilterCriteria convertToFilterCriteria(Filter<?> filter, String searchMapCode) throws ServiceException {
+		
 		FilterCriteria filterCriteria = new FilterCriteria();
-		this.convert(filter, filterCriteria, DaoUtil.getTableName(entityClass)); 
-		updateAdditionals(filterCriteria, filter);
+		ConverterResultData converterResultData =  this.convert(filter, filterCriteria, searchMapCode); 
+		updateAdditionals(filterCriteria, filter, converterResultData);
+		filterCriteria.setCode(searchMapCode);
 		
 		return filterCriteria;
 	}
 	
-	public WhereCriteria convertToQueryCriteria(Filter filter,  Class<?>  entityClass) throws ServiceException {
-		WhereCriteria whereCriteria = new WhereCriteria();
-		this.convert(filter, whereCriteria, DaoUtil.getTableName(entityClass)); 
-		updateAdditionals(whereCriteria, filter);
+    @Override
+	public WhereCriteria convertToQueryCriteria(Filter<?> filter,  String searchMapCode ) throws ServiceException {
+		
+		WhereCriteria whereCriteria = new WhereCriteria(); 
+		ConverterResultData converterResultData =  this.convert(filter, whereCriteria, searchMapCode); 
+		updateAdditionals(whereCriteria, filter, converterResultData);
+		whereCriteria.setCode(searchMapCode);
 		
 		return whereCriteria;
 	}
-	
-	public WhereCriteria convertToQueryCriteria(Filter filter,  String tableCode) throws ServiceException {
-		WhereCriteria queryCriteria = new WhereCriteria(); 
-		this.convert(filter, queryCriteria, tableCode); 
-		updateAdditionals(queryCriteria, filter);
-		
-		return queryCriteria;
-	}
-/**	
-	public SearchCriteriaVO convertToSearchCriteriaVO (Filter filter, Class<EntityBase> entityClass) throws ServiceException {
-		SearchCriteria searchCriteria = new SearchCriteria();
-		this.convert(filter, searchCriteria, DaoUtil.getTableName(entityClass));  
-		updateAdditionals(searchCriteria, filter);
-		
-		return searhCriteriaVOConverter.toVO(searchCriteria);
-	}
-	*/
-	 /**
-	public SearchCriteria converToCQueryName(BusinessRule businessRule ,Class<EntityBase> entityClass) throws ServiceException { 
-		
-		CTableVO cTableVO = mdTableRecoverService.getObjectInfo(businessRule.getCode(), null);
-		if(cTableVO == null) throw new ServiceException("No se encontr� informaci�n de la entidad");
-		
-		SearchCriteria searchCriteria = new SearchCriteria();
-		searchCriteria.select(cTableVO.getName());
-		
-		//@TODO ??
-		//ConverterResultData converterResultData =  this.convert(null, searchCriteria, DaoUtil.getTableName(entityClass)); 
-		//cQueryName.select(converterResultData.getSelect());
-		//cQueryName.groupBy(converterResultData.getGroupBy());
-		return searchCriteria;
-	}
-	*/
-	protected void updateAdditionals(CriteriaFunction<?> findFilter, Filter filter) {
+ 
+	protected void updateAdditionals(CriteriaFunction<?> findFilter, Filter<?> filter, ConverterResultData converterResultData) {
 		
 		//order
 		
@@ -113,6 +81,9 @@ import org.platkmframework.database.manager.processor.util.DaoUtil;
 			findFilter.orderBy(filter.getOrderColumn(),SqlOrder.asc); 
 		else if(SqlOrder.desc.name().equals(filter.getOrderType()))
 			findFilter.orderBy(filter.getOrderColumn(),SqlOrder.desc); 
+		else {
+			findFilter.orderBy(converterResultData.getDefaultOrderColumn(),SqlOrder.valueOf(converterResultData.getDefaultOrderType().toLowerCase())); 
+		}
 		
 		findFilter.addOffSetInfo(filter.getRecordPerPage(), filter.getPage());
 		//offset
@@ -120,17 +91,17 @@ import org.platkmframework.database.manager.processor.util.DaoUtil;
 		//findFilter.setRecordPerPage(filter.getRecordPerPage());
 		   
 		//fastsearch
-		findFilter.addFastSearchInfo(filter.getFastsearch());
+		findFilter.addFastSearchInfo(filter.getFastsearch(), converterResultData.getFastSearchColumns());
  
 	}
 	
-	protected void updateAdditionals(CriteriaBase findFilter, Filter filter) {
+	protected void updateAdditionals(CriteriaBase findFilter, Filter<?> filter, ConverterResultData converterResultData) {
 		
 		//order
 		
-		if(SqlOrder.asc.name().equals(filter.getOrderType()))
+		if(SqlOrder.asc.name().equalsIgnoreCase(filter.getOrderType()))
 			findFilter.orderBy(filter.getOrderColumn(),SqlOrder.asc); 
-		else if(SqlOrder.desc.name().equals(filter.getOrderType()))
+		else if(SqlOrder.desc.name().equalsIgnoreCase(filter.getOrderType()))
 			findFilter.orderBy(filter.getOrderColumn(),SqlOrder.desc); 
 		
 		findFilter.addOffSetInfo(filter.getRecordPerPage(), filter.getPage());
@@ -139,7 +110,7 @@ import org.platkmframework.database.manager.processor.util.DaoUtil;
 		//findFilter.setRecordPerPage(filter.getRecordPerPage());
 		   
 		//fastsearch
-		findFilter.addFastSearchInfo(filter.getFastsearch());
+		findFilter.addFastSearchInfo(filter.getFastsearch(), converterResultData.getFastSearchColumns());
  
 	}
      

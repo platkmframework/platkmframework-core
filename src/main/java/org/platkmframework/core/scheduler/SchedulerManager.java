@@ -40,8 +40,8 @@ import org.platkmframework.annotation.timer.TimerFixeRateScheduler;
 import org.platkmframework.annotation.timer.TimerScheduler;
 import org.platkmframework.content.ioc.BeanMethodInfo;
 import org.platkmframework.content.ioc.ObjectContainer;
+import org.platkmframework.content.project.CorePropertyConstant;
 import org.platkmframework.content.project.ProjectContent;
-import org.platkmframework.core.request.CorePropertyConstant;
 
 public class SchedulerManager {
 	

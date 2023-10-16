@@ -19,6 +19,7 @@
 package org.platkmframework.core.domain.base.converter;
  
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +27,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.platkmframework.annotation.db.SearchFilter;
+import org.platkmframework.annotation.db.SearchFilterColumn;
 import org.platkmframework.common.domain.filter.criteria.base.ConditionFilterBase;
 import org.platkmframework.common.domain.filter.enumerator.ConditionOperator;
 import org.platkmframework.common.domain.filter.enumerator.GroupOperator;
@@ -34,7 +37,10 @@ import org.platkmframework.common.domain.filter.enumerator.SqlOperator;
 import org.platkmframework.common.domain.filter.ui.BaseFilter;
 import org.platkmframework.common.domain.filter.ui.FilterCondition;
 import org.platkmframework.comon.service.exception.ServiceException;
-import org.platkmframework.database.manager.exception.DatabaseConnectionException; 
+import org.platkmframework.content.ioc.ObjectContainer;
+import org.platkmframework.database.manager.exception.DatabaseConnectionException;
+import org.platkmframework.domain.base.service.base.SearchFilterConditionData;
+import org.platkmframework.domain.base.service.base.SearchFilterData; 
 
 
 /**
@@ -49,83 +55,118 @@ public abstract class BaseFilterToFindFilterConverter {
 	private static final Logger logger = LogManager.getLogger(BaseFilterToFindFilterConverter.class);
 	  
 	
-	protected ConverterResultData convertByTableCode(BaseFilter filter, ConditionFilterBase findFilter, String code) throws ServiceException {
+	protected ConverterResultData convertByTableCode(BaseFilter filter, ConditionFilterBase findFilter, String searchMapCode) throws ServiceException {
  
-		return convert(filter, findFilter, code);
+		return convert(filter, findFilter, searchMapCode);
 	}
   
-	protected ConverterResultData convert(BaseFilter filter, ConditionFilterBase findFilter, String code) throws ServiceException {
+	protected ConverterResultData convert(BaseFilter filter, ConditionFilterBase findFilter, String searchMapCode) throws ServiceException {
 		   
 		ConverterResultData converterResultData = new ConverterResultData();
 		if(filter == null) return converterResultData;
 		 
-		processConditions(converterResultData, filter, findFilter, code); 
+		processConditions(converterResultData, filter, findFilter, searchMapCode); 
 		
 		return converterResultData;
 	}  
 	
-	protected void processConditions(ConverterResultData converterResultData, BaseFilter filter, ConditionFilterBase findFilter, String code) throws ServiceException {
+	protected void processConditions(ConverterResultData converterResultData, BaseFilter filter, ConditionFilterBase findFilter, String searchMapCode) throws ServiceException {
 		
-		try { 
-			    
-			Map<String, SearchFilterFieldInfo> filterFieldInfoMap = SearchFilterManager.instance().getFilterInfo(code);
-			if(!filter.getConditions().isEmpty() && filterFieldInfoMap != null && !filterFieldInfoMap.isEmpty() ){
-					
-					List<String> columns = new ArrayList<>();
-					List<String> groupsby = new ArrayList<>();
-					String columnName = "";
-					MathOperator mathOperator; 
-					SearchFilterFieldInfo searchFilterFieldInfo;
-					for (FilterCondition filterCondition : filter.getConditions()){
-						
-						 checkCustomFormat(filterCondition);
-						
-						if(StringUtils.isNotEmpty(filterCondition.getFieldCode()))
+		try {
+			
+			if(StringUtils.isNotBlank(searchMapCode)) {
+				SearchFilterData searchFilterData = getSearchMapByCode(searchMapCode);
+				if(searchFilterData != null){ 
+					if(!filter.getConditions().isEmpty() && searchFilterData.getSearchMap() != null && searchFilterData.getSearchMap().size() >0){
+						Map<String, SearchFilterConditionData>  colMap =  searchFilterData.getSearchMap();
+						List<String> columns = new ArrayList<>();
+						List<String> groupsby = new ArrayList<>();
+						String columnName = "";
+						MathOperator mathOperator;  
+						FilterCondition filterCondition;
+						for (int i = 0; i <filter.getConditions().size(); i++)
 						{
-							searchFilterFieldInfo = filterFieldInfoMap.get(filterCondition.getFieldCode());
-							if(searchFilterFieldInfo == null)
-								throw new DatabaseConnectionException("filter variable name not found");
-							if(StringUtils.isBlank(filterCondition.getTcode())) {
-								filterCondition.setColumnName(searchFilterFieldInfo.getColumn());
-							}else {
-								filterCondition.setColumnName(filterCondition.getTcode() + "." + searchFilterFieldInfo.getColumn());
+							filterCondition = filter.getConditions().get(i);
+							columnName      = filterCondition.getColumnName();
+							
+							if(StringUtils.isEmpty(columnName)){
+								logger.error("El campo del la condición de búsqueda está vacío searchCode-> " + searchMapCode + " indice -> " + i);
+								throw new ServiceException("No están correctas las condiciones de búsqueda");
 							}
+							 
+							if(!colMap.containsKey(columnName)){
+								logger.error("El código de la condición de búsqueda no se encuetra en la configuración -> " + searchMapCode + " codigo -> " + columnName + "indice->" +i);
+								throw new ServiceException("No están correctas las condiciones de búsqueda");
+							}
+							
+							columnName = colMap.get(columnName).getColumn();
+							
+							if(StringUtils.isBlank(filterCondition.getColumnPrefix())){
+								filterCondition.setColumnName(columnName);
+							}else {
+								filterCondition.setColumnName(filterCondition.getColumnPrefix() + "." + columnName);
+							}
+								
+							checkCustomFormat(filterCondition);
 							
 							if(StringUtils.isNotBlank(filterCondition.getMathOperation())) {
 								mathOperator = MathOperator.valueOf(filterCondition.getMathOperation()); 
-								if(mathOperator == null)
-									throw new ServiceException("no se reconoce la operaci�n matem�tica");
+								if(mathOperator == null) throw new ServiceException("no se reconoce la operación matemática");
 								
 								if("sum".equals(mathOperator.name())) {
-									columnName = "SUM(" + searchFilterFieldInfo.getColumn() + ") AS " + searchFilterFieldInfo.getColumn();
+									columns.add("SUM(" + columnName + ") AS " + columnName);
 								}else if("max".equals(mathOperator.name())) {
-									columnName = "MAX(" + searchFilterFieldInfo.getColumn() + ") AS " + searchFilterFieldInfo.getColumn();
+									columns.add("MAX(" + columnName + ") AS " + columnName);
 								}else if("count".equals(mathOperator.name())) {
-									columnName = "COUNT(" + searchFilterFieldInfo.getColumn() + ") AS " + searchFilterFieldInfo.getColumn();
+									columns.add("COUNT(" + columnName + ") AS " + columnName);
 								}else if("min".equals(mathOperator.name())) {
-									columnName = "MIN(" + searchFilterFieldInfo.getColumn() + ") AS " + searchFilterFieldInfo.getColumn();
+									columns.add("MIN(" + columnName + ") AS " + columnName);
 								}
-								columns.add(columnName);
-								groupsby.add(searchFilterFieldInfo.getColumn());
+								//columns.add(columnName);
+								groupsby.add(columnName);
 							}
 							
 							addCondition(findFilter, filterCondition );
-						}  
+						 
+						} 
+						converterResultData.setSelect(columns.stream().collect(Collectors.joining(",")));
+						converterResultData.setGroupBy(groupsby.stream().collect(Collectors.joining(",")));
+						//@TODO
+						//converterResultData.setHaving(columnName);
 					} 
-					converterResultData.setSelect(columns.stream().collect(Collectors.joining(",")));
-					converterResultData.setGroupBy(groupsby.stream().collect(Collectors.joining(",")));
 					
-					//@TODO
-					//converterResultData.setHaving(columnName);
-				} 
-	
+					if(StringUtils.isNotBlank(searchFilterData.getFastsearch())) {
+						converterResultData.setFastSearchValue(filter.getFastsearch());
+						converterResultData.setFastSearchColumns(searchFilterData.getFastsearch().split(","));
+					}
+					converterResultData.setDefaultOrderType(searchFilterData.getDefaultOrderType());
+					converterResultData.setDefaultOrderColumn(searchFilterData.getDefaultOrderColumn());
+				}
+			}
 			 
 		}catch (Exception e) {
 			logger.error(e,e);
 			throw new ServiceException("no se ha podido devolver informacion");
 		}
 	}
- 
+  
+
+	protected SearchFilterData getSearchMapByCode(String searchMapCode) throws ServiceException {
+		
+		SearchFilter searchFilter = ObjectContainer.instance().getSearchMapInfo(searchMapCode);
+		if(searchFilter == null) return null;
+		
+		SearchFilterData searchFilterData = new SearchFilterData(searchFilter.fastsearch(), searchFilter.orderColumn(), searchFilter.orderType());
+		
+		Map<String, SearchFilterConditionData> searchMap = new HashMap<>();
+		for (SearchFilterColumn searchFilterColumn : searchFilter.columns()){
+			searchMap.put(searchFilterColumn.column(), new SearchFilterConditionData(searchFilterColumn.label(),
+																					searchFilterColumn.code(), 
+																					searchFilterColumn.column()));
+		}
+		searchFilterData.setSearchMap(searchMap);
+		return searchFilterData;
+	}
 
 	public void addCondition(ConditionFilterBase findFilter, FilterCondition filterCondition) throws ServiceException 
 	{   
@@ -136,7 +177,7 @@ public abstract class BaseFilterToFindFilterConverter {
 		if(StringUtils.isNotBlank(filterCondition.getSoperator())) {
 			sqlOperator = SqlOperator.valueOf(filterCondition.getSoperator());
 			if(sqlOperator == null) {
-				 throw new DatabaseConnectionException("no se encontr� el operador");
+				 throw new DatabaseConnectionException("no se encontró el operador");
 			}
 			
 			if(SqlOperator.and.name().equalsIgnoreCase(sqlOperator.name())) {
@@ -148,7 +189,7 @@ public abstract class BaseFilterToFindFilterConverter {
 		}
 		if(StringUtils.isNotBlank(filterCondition.getInitGroup())){
 			groupOperator = GroupOperator.valueOf(filterCondition.getInitGroup());
-			if(groupOperator == null) throw new DatabaseConnectionException("no se encontr� el operador"); 
+			if(groupOperator == null) throw new DatabaseConnectionException("no se encontró el operador"); 
 			if(GroupOperator.open.name().equalsIgnoreCase(groupOperator.name())) {
 				findFilter.op();
 			}else if(GroupOperator.close.name().equalsIgnoreCase(groupOperator.name())) {
@@ -158,7 +199,7 @@ public abstract class BaseFilterToFindFilterConverter {
 		
 		if(StringUtils.isNotBlank(filterCondition.getOperator())){
 			conditionOperator = ConditionOperator.valueOf(filterCondition.getOperator());
-			if(conditionOperator == null) throw new DatabaseConnectionException("no se encontr� el operador");
+			if(conditionOperator == null) throw new DatabaseConnectionException("no se encontró el operador");
 			findFilter.valexp( filterCondition.getColumnName(), conditionOperator, filterCondition.getValue());
 		}
 
@@ -177,33 +218,28 @@ public abstract class BaseFilterToFindFilterConverter {
 		} 	 
 	}
 
-
-
 	
-	
-	protected String checkCustomFormat(FilterCondition filterCondition) 
+	protected void checkCustomFormat(FilterCondition filterCondition) 
 	{
 		if(filterCondition.getValue() != null && filterCondition.getValue().toString().contains(":"))
 		{
 			String[] arrayFecha = filterCondition.getValue().toString().split(":");
-			String formato = arrayFecha[0].toString().trim();
+			String   formato    = arrayFecha[0].toString().trim();
 			
 			if("y".equals(formato)) 
 			{
 				filterCondition.setValue(arrayFecha[1]);
-				return " YEAR(" + filterCondition.getColumnName() + ") ";
+				filterCondition.setColumnName("YEAR(" + filterCondition.getColumnName() + ")");
 			}else if("m".equals(formato)) 
 			{
-				filterCondition.setColumnName(arrayFecha[1]);
-				return " MONTH(" + filterCondition.getColumnName()  + ") ";
+				filterCondition.setValue(arrayFecha[1]);
+				filterCondition.setColumnName("MONTH(" + filterCondition.getColumnName() + ")");
 			}else if("d".equals(formato)) 
 			{
-				filterCondition.setColumnName(arrayFecha[1]);
-				return " DAY(" + filterCondition.getColumnName() + ") ";
+				filterCondition.setValue(arrayFecha[1]);
+				filterCondition.setColumnName("DAY(" + filterCondition.getColumnName() + ")");
 			} 
-			
-		}
-		return filterCondition.getColumnName();
+		} 
 	}
 	
 	protected List<String> getFieldsCode(BaseFilter filter){

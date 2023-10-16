@@ -18,12 +18,11 @@
  *******************************************************************************/
 package org.platkmframework.core.request.servlet;
 
-import java.io.IOException;  
- 
+import java.io.IOException;
 
 import org.platkmframework.core.request.exception.CustomServletException;
 import org.platkmframework.core.request.manager.HttpRequestManager;
-import org.platkmframework.core.security.core.xss.XSSRequestWrapper;
+import org.platkmframework.security.content.XSSRequestWrapper;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -66,25 +65,7 @@ public class RequestManagerServlet extends HttpServlet{
 	private void process(HttpServletRequest request, HttpServletResponse response) throws CustomServletException 
 	{ 
 
-	    //out.println("<title>Example</title><"); 
-	    //out.println("<h2>Button Clicked</h2>");
-
-	    /**String DATA = request.getParameter("DATA");
-
-	    if(DATA != null){
-	      out.println(DATA);
-	    } else {
-	      out.println("No text entered.");
-	    }*/
-
-	   // out.println("<P>Return to  <A HREF=>Form</A>");
-	   //try 
-	  // {
 		   XSSRequestWrapper xssReq = new XSSRequestWrapper(request);
 		   HttpRequestManager.instance().process(xssReq, response); 
-	   //} catch (RequestManagerException e) 
-	  // { 
-		//   throw new ServletException(e.getMessage()); 
-	  // } 
 	}
 }

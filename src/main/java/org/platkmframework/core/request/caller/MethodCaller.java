@@ -18,19 +18,25 @@
  *******************************************************************************/
 package org.platkmframework.core.request.caller;
 
-import java.io.IOException; 
+import java.io.IOException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter; 
 import java.text.ParseException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map; 
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.platkmframework.annotation.ClassMethod;
 import org.platkmframework.annotation.HeaderParam;
 import org.platkmframework.annotation.RequestBody;
 import org.platkmframework.annotation.RequestParam;
 import org.platkmframework.annotation.Service;
+import org.platkmframework.annotation.UIFilterToSearchConverter;
+import org.platkmframework.annotation.exception.UIFilterToSearchConverterException;
+import org.platkmframework.comon.service.exception.ServiceException;
 import org.platkmframework.content.ioc.ApiMethodInfo;
 import org.platkmframework.content.ioc.ObjectContainer;
 import org.platkmframework.core.request.exception.RequestProcessException;
@@ -38,7 +44,7 @@ import org.platkmframework.core.request.exception.ResourceNotFoundException;
 import org.platkmframework.core.request.exception.ResourcePermissionException;
 import org.platkmframework.core.request.exception.UnKnowProcessRequestException; 
 import org.platkmframework.core.request.util.ValidateRequiredAttributeUtil;
-import org.platkmframework.core.session.SessionContentManager;
+import org.platkmframework.security.content.SecurityContent;
 import org.platkmframework.util.JsonException;
 import org.platkmframework.util.error.InvocationException;
 import org.platkmframework.util.reflection.ReflectionUtil;
@@ -62,83 +68,120 @@ public class MethodCaller
 	
 	private static final Logger logger = LogManager.getLogger(MethodCaller.class);
 
-	/**
-	 * 
-	 * @param apiName
-	 * @param methodName
-	 * @param req
-	 * @param resp
-	 * @param param
-	 * @return
-	 * @throws RequestManagerException 
-	 * @throws ReflectionError 
-	 * @throws IOException 
-	 * @throws JsonException 
-	 * @throws ParseException 
-	 */
-/*	public Object execute(String apiName, String methodName, 
-			  HttpServletRequest req, HttpServletResponse resp,
-			  Map<String, Object> param) throws RequestManagerException, ReflectionError, IOException, JsonException, ParseException 
-	{
-		Object obj = SessionContentManager.instance().getSessionObjectByPath(apiName);
-		if(obj == null)
-			throw new RequestManagerException("not found component by path send");
-		 
-		  
-		return execute(obj, methodName, req, resp, param);
-		
-	}*/
-	
-	/**
-	 * 
-	 * @param obj
-	 * @param methodName
-	 * @return
-	 */
 
-	
 	/**
 	 * 
-	 * @param obj
-	 * @param method
+	 * @param path
 	 * @param req
 	 * @param resp
-	 * @param param
 	 * @return
 	 * @throws ResourceNotFoundException
-	 * @throws ResourcePermissionException 
-	 * @throws UnKnowProcessRequestException 
-	 * @throws RequestProcessException 
-	 * @throws ServletException 
-	 * @throws InvocationException
-	 * @throws IOException
-	 * @throws JsonException
-	 * @throws ParseException
+	 * @throws ResourcePermissionException
+	 * @throws UnKnowProcessRequestException
+	 * @throws RequestProcessException
+	 * @throws ServletException
+	 * @throws ServiceException
+	 * @throws UIFilterToSearchConverterException
 	 */
 	
 	public Object execute(String path,
-			  HttpServletRequest req, HttpServletResponse resp) throws ResourceNotFoundException, ResourcePermissionException, UnKnowProcessRequestException, RequestProcessException, ServletException{  
+			  HttpServletRequest req, HttpServletResponse resp) throws ResourceNotFoundException, ResourcePermissionException, UnKnowProcessRequestException, RequestProcessException, ServletException, ServiceException, UIFilterToSearchConverterException{  
 			
 		 
 		logger.info("searching object from -> " + path  + " - " +  req.getMethod());
-		String key = "{" + req.getMethod() + ":"  + path + "}";
-		ApiMethodInfo apiMethodInfo = ObjectContainer.instance().getApiMehtodByKey(key); // PathProccesor.getSessionObjectByPath(path, req.getMethod());
-		if(apiMethodInfo == null) throw new ResourceNotFoundException(key);
-		 
-		return execute(apiMethodInfo, req, resp); 
+		//String key = "{" + req.getMethod() + ":"  + path + "}";
+		
+		ApiMethodInfo apiMethodInfo = ObjectContainer.instance().getApiMethodInfo(path); // PathProccesor.getSessionObjectByPath(path, req.getMethod());
+		if(apiMethodInfo == null)
+			throw new ResourceNotFoundException("recurso no encontrado - " + req.getRequestURL().toString());
+		
+		List<Method> methods = apiMethodInfo.getMapMethod().
+				entrySet().
+				stream().
+				filter((e)->(
+						req.getMethod().equalsIgnoreCase(e.getKey())
+						)
+					).
+				map(Map.Entry::getValue).
+				findFirst().
+				orElse(null);
+		
+		if(methods == null || methods.size() == 0) throw new ResourceNotFoundException("recurso no encontrado - " + req.getRequestURL().toString());
+		
+		String controllerPath = apiMethodInfo.getControllerPath();
+		Method methodFound = methods.stream().filter( (m) ->(
+			
+				path.
+				equalsIgnoreCase((controllerPath + "/" + m.getAnnotation(ClassMethod.class).name()))
+			
+		)).findFirst().orElse(null); 
+		
+		Map<String, Object> pathParameter = new HashMap<>();
+		if(methodFound != null) return execute(apiMethodInfo, methodFound, pathParameter, req, resp);
+		
+		//path variable
+		String[] arrayPath = path.split("/");
+		String methodPath;
+		String[] arrayMethodPath;
+		Parameter[] parameters;
+		String auxParam;
+		String auxPath;
+		
+		for (Method method : methods){
+			methodPath = method.getAnnotation(ClassMethod.class).name();
+			if(StringUtils.isEmpty(methodPath) && path.equalsIgnoreCase(controllerPath)) return execute(apiMethodInfo, methodFound, pathParameter, req, resp);
+			
+			if(methodPath.contains("{")) {
+				auxPath = controllerPath + "/" + methodPath;
+				arrayMethodPath = auxPath.split("/");
+				if(arrayPath.length == arrayMethodPath.length && method.getParameters().length >0) {
+					
+					pathParameter.clear();
+					parameters = method.getParameters();
+					 for (int i = 0; i < arrayMethodPath.length; i++) {
+						if(arrayMethodPath[i].contains("{")) {
+							auxParam = arrayMethodPath[i].replace("{","").replace("}","");
+							
+							for (Parameter parameter : parameters){
+								if(parameter.isAnnotationPresent(RequestParam.class) && 
+										parameter.getAnnotation(RequestParam.class).name().equalsIgnoreCase(auxParam)){  
+									auxPath = auxPath.replace("{" + auxParam + "}", arrayPath[i]);
+									pathParameter.put(auxPath, arrayPath[i]);
+								} 
+							}
+						}
+					}
+					if(auxPath.equalsIgnoreCase(path)) return execute(apiMethodInfo, methodFound, pathParameter, req, resp);
+				}
+			}
+		}		
+		throw new ResourceNotFoundException("recurso no encontrado - " + req.getRequestURL().toString());
 	}
 	
-	protected Object execute(ApiMethodInfo apiMethodInfo, 
+	/**
+	 * 
+	 * @param apiMethodInfo
+	 * @param method
+	 * @param pathParameter
+	 * @param req
+	 * @param resp
+	 * @return
+	 * @throws ResourceNotFoundException
+	 * @throws ResourcePermissionException
+	 * @throws UnKnowProcessRequestException
+	 * @throws RequestProcessException
+	 * @throws ServletException
+	 * @throws ServiceException
+	 * @throws UIFilterToSearchConverterException
+	 */
+	protected Object execute(ApiMethodInfo apiMethodInfo, Method method, Map<String, Object> pathParameter,
 						  HttpServletRequest req, HttpServletResponse resp) throws ResourceNotFoundException, ResourcePermissionException, 
-																UnKnowProcessRequestException, RequestProcessException, ServletException{ 
+																UnKnowProcessRequestException, RequestProcessException, ServletException, ServiceException, UIFilterToSearchConverterException{ 
 		try {
 			
-			if(apiMethodInfo == null)
-				throw new ResourceNotFoundException("recurso no encontrado - " + req.getRequestURL().toString());
-			
-			checkAuthorizationPermission(apiMethodInfo);
+			checkAuthorizationPermission(apiMethodInfo, method);
  		
-			Parameter[] parameters = apiMethodInfo.getMethod().getParameters();
+			Parameter[] parameters = method.getParameters();
 			Object[] paramValue = null;
 			if(parameters != null)
 			{ 
@@ -149,7 +192,7 @@ public class MethodCaller
 					Parameter parameter = parameters[i]; 
 					value = null;
 					
-					logger.info("object parameter -> " + apiMethodInfo.getObj().toString()  + " - " +  parameter.toString());
+					logger.info("object parameter -> " + apiMethodInfo.getContObject().toString()  + " - " +  parameter.toString());
 				 
 					//is body json? 
 					RequestBody requestBody;
@@ -160,8 +203,12 @@ public class MethodCaller
 					{
 						requestBody = parameter.getAnnotation(RequestBody.class);
 						required = requestBody.required();
+						Class<? extends UIFilterToSearchConverter>  uiFilterToSearchConverter = null;
+						if(requestBody.converter().length>0) 
+							uiFilterToSearchConverter = requestBody.converter()[0];
 						
-						value = ObjetTypeConverter.converBodyValueToObjectType(parameter, required, req);
+						
+						value = ObjetTypeConverter.converBodyValueToObjectType(parameter, required, uiFilterToSearchConverter, req);
 						
 						if(value == null && requestBody.required())
 							throw new ResourceNotFoundException("The body parameter value is required " );
@@ -191,8 +238,7 @@ public class MethodCaller
 					}else if(parameter.isAnnotationPresent(RequestParam.class)){   
 						requestParam = parameter.getAnnotation(RequestParam.class);
 						required = requestParam.required();
-						parameterName = requestParam.name();
-						value = ObjetTypeConverter.converParamValueToObjectType(requestParam.name(),requestParam.required(),parameter, req, false);
+						value = ObjetTypeConverter.converParamValueToObjectType(requestParam.name(),requestParam.required(),parameter, req, false, pathParameter.containsKey(parameterName)?pathParameter.get(parameterName):req.getParameter(requestParam.name()));
 					
 					}else if(parameter.isAnnotationPresent(HeaderParam.class)){
 						Map<String, Object> header = new HashMap<>();
@@ -228,7 +274,7 @@ public class MethodCaller
 				}  
 			}
 			
-			return ReflectionUtil.invokeMethod(apiMethodInfo.getObj(), apiMethodInfo.getMethod(), paramValue); 
+			return ReflectionUtil.invokeMethod(apiMethodInfo.getContObject(), method, paramValue); 
 			
 		} catch (InvocationException e){ 
 			
@@ -244,16 +290,23 @@ public class MethodCaller
 		}   
 	}
 
-	private void checkAuthorizationPermission(ApiMethodInfo apiMethodInfo) throws ResourcePermissionException {
+	private void checkAuthorizationPermission(ApiMethodInfo apiMethodInfo, Method method) throws ResourcePermissionException {
 	  
-		if(  apiMethodInfo.getRoles() == null  || apiMethodInfo.getRoles().length == 0  || (SessionContentManager.instance().getPrincipal() == null || !containsAtLeastOneRole(apiMethodInfo.getRoles()))) 
-			throw new ResourcePermissionException("no tiene permisos"); 
+		String[] controllRoles = apiMethodInfo.getControllerRoles();
+		String[] methodRoles   = apiMethodInfo.getMethodRoles(method);
+		
+		if(methodRoles != null && methodRoles.length >0) {
+			if(!containsAtLeastOneRole(methodRoles)) throw new ResourcePermissionException("no tiene permisos");
+		
+		}else if(controllRoles != null && controllRoles.length >0) {
+			if(!containsAtLeastOneRole(controllRoles)) throw new ResourcePermissionException("no tiene permisos");
+		}
 	}
 
 	private boolean containsAtLeastOneRole(String[] roles) { 
-		if(roles == null) return false;
+		if(roles == null || SecurityContent.instance().getPrincipal() == null) return false;
 		for (int i = 0; i < roles.length; i++) {
-			if(SessionContentManager.instance().getPrincipal().getRoles().contains(roles[i])) return true;
+			if(SecurityContent.instance().getPrincipal().credentials().contains(roles[i])) return true;
 		} 
 		return false;
 	}

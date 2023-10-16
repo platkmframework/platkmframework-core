@@ -18,16 +18,15 @@
  *******************************************************************************/
 package org.platkmframework.core.request.filter;
 
-import java.io.IOException; 
- 
- 
+import java.io.IOException;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.eclipse.jetty.http.HttpStatus;
 import org.platkmframework.content.ioc.ObjectContainer;
 import org.platkmframework.core.request.exception.CustomServletException;
 import org.platkmframework.core.response.util.ResponseUtil;
-import org.platkmframework.core.session.SessionContentManager;
+import org.platkmframework.security.content.SecurityContent;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -66,6 +65,7 @@ public class ExceptionFilter implements Filter
 			throwNoControlledError = false;
 		} catch (CustomServletException e) 
 		{
+			logger.error(e,e);
 			throwNoControlledError = false;
 			processException(resp, e); 
 		
@@ -74,7 +74,7 @@ public class ExceptionFilter implements Filter
 			logger.error(e,e);
 			sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500,  "No se pudo realizar el proceso, inténtelo más tarde"); 
 		}finally {
-			SessionContentManager.instance().clean();
+			SecurityContent.instance().clear();
 			if(throwNoControlledError)
 				sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500,  "No se pudo realizar el proceso, inténtelo más tarde"); 
 		}  

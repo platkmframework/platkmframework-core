@@ -18,7 +18,6 @@
  *******************************************************************************/
 package org.platkmframework.core.domain.base.converter;
 
-
 /**
  *   Author: 
  *     Eduardo Iglesias
@@ -30,6 +29,10 @@ public class ConverterResultData {
 	private String select;
 	private String groupBy;
 	private String having;
+	private String fastSearchValue;
+	private String[] fastSearchColumns;
+	private String defaultOrderColumn;
+	private String defaultOrderType;
 	
 	
 	public ConverterResultData() {
@@ -58,7 +61,39 @@ public class ConverterResultData {
 	public void setHaving(String having) {
 		this.having = having;
 	}
+
+	public String getFastSearchValue() {
+		return fastSearchValue;
+	}
+
+	public void setFastSearchValue(String fastSearchValue) {
+		this.fastSearchValue = fastSearchValue;
+	}
+
+	public String[] getFastSearchColumns() { 
+		return fastSearchColumns;
+	}
+
+	public void setFastSearchColumns(String[] fastSearchColumns) {
+		this.fastSearchColumns = fastSearchColumns;
+	}
+
+	 
+	public String getDefaultOrderColumn() {
+		return defaultOrderColumn;
+	}
+
+	public void setDefaultOrderColumn(String defaultOrderColumn) {
+		this.defaultOrderColumn = defaultOrderColumn;
+	}
+
+	public String getDefaultOrderType() {
+		return defaultOrderType;
+	}
+
+	public void setDefaultOrderType(String defaultOrderType) {
+		this.defaultOrderType = defaultOrderType;
+	}
 	
- 
 
 }
