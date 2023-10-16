@@ -308,7 +308,7 @@ public class ObjetTypeConverter
 	 * @throws InvocationException 
 	 * @throws ServiceException 
 	 */
-	private static  List _processAttributeList(String htmlFieldName,
+	private static  List<Object> _processAttributeList(String htmlFieldName,
 								Object obj,
 								Field field,
 								Map<String, Object> param, 
@@ -324,17 +324,17 @@ public class ObjetTypeConverter
 			String[] parameterValues = req.getParameterValues(htmlFieldName);
 			if(parameterValues == null || parameterValues.length ==0)
 				return null;
-			
+			ArrayList<Object> result = new ArrayList<Object>();
 			if(genericType.getClass().equals(Long.class))  
-				return _fillByClassType(new ArrayList<Integer>(), parameterValues, Long.class);
+				return _fillByClassType(result, parameterValues, Long.class);
 			else if(genericType.getClass().equals(Integer.class)) 
-				return _fillByClassType(new ArrayList<Integer>(), parameterValues, Integer.class);
+				return _fillByClassType(result, parameterValues, Integer.class);
 			else if(genericType.getClass().equals(Float.class)) 
-				return _fillByClassType(new ArrayList<Integer>(), parameterValues, Float.class);
+				return _fillByClassType(result, parameterValues, Float.class);
 			else if(genericType.getClass().equals(Date.class)) 
-				return _fillByClassType(new ArrayList<Integer>(), parameterValues, Date.class);
+				return _fillByClassType(result, parameterValues, Date.class);
 			else if(genericType.getClass().equals(Boolean.class)) 
-				return _fillByClassType(new ArrayList<Boolean>(), parameterValues, Boolean.class);
+				return _fillByClassType(result, parameterValues, Boolean.class);
 			else 
 				throw new ResourceNotFoundException("The class type-> " + genericType.getClass().getName() + " is not included to process");
 		}else
@@ -368,9 +368,9 @@ public class ObjetTypeConverter
 	 * @throws ParseException 
 	 * @throws ServiceException 
 	 */	
-	private static List _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws InvocationException, ParseException, ResourceNotFoundException, ServiceException 
+	private static List<Object> _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws InvocationException, ParseException, ResourceNotFoundException, ServiceException 
 	{
-		List  list = (List )ReflectionUtil.getAttributeValue(obj, field);
+		List<Object>  list = (List ) ReflectionUtil.getAttributeValue(obj, field);
 		List<Field> fields = ReflectionUtil.getAllFieldHeritage(obj.getClass());
 		if(fields != null)
 		{ 
@@ -445,7 +445,7 @@ public class ObjetTypeConverter
 	 * @throws ParseException
 	 * @throws ResourceNotFoundException
 	 */
-	private static List _fillByClassType(ArrayList list, String[] parameterValues, Class class1) throws ParseException, ResourceNotFoundException 
+	private static List<Object> _fillByClassType(ArrayList<Object> list, String[] parameterValues, Class<?> class1) throws ParseException, ResourceNotFoundException 
 	{
 		for (int i = 0; i < parameterValues.length; i++)   
 			list.add(_getValue(parameterValues[i], class1)); 
