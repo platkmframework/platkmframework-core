@@ -20,13 +20,15 @@ package org.platkmframework.core.request.filter;
 
 import java.io.IOException;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.content.ioc.ObjectContainer;
-import org.platkmframework.core.request.exception.CustomServletException;
+import org.platkmframework.comon.service.exception.CustomServletException;
+import org.platkmframework.content.ObjectContainer;
 import org.platkmframework.core.response.util.ResponseUtil;
+import org.platkmframework.proxy.ProxyProcesorException;
 import org.platkmframework.security.content.SecurityContent;
+import org.platkmframework.security.exception.AuthSecurityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -47,7 +49,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class ExceptionFilter implements Filter
 {
 	
-	private static final Logger logger = LogManager.getLogger(ExceptionFilter.class);
+	private static Logger logger = LoggerFactory.getLogger(ExceptionFilter.class);
 	
 	@Override
 	public void destroy() {}
@@ -65,14 +67,34 @@ public class ExceptionFilter implements Filter
 			throwNoControlledError = false;
 		} catch (CustomServletException e) 
 		{
-			logger.error(e,e);
+			logger.error(e.getMessage());
 			throwNoControlledError = false;
 			processException(resp, e); 
 		
-		} catch (Exception e) 
+		}catch (ProxyProcesorException e) 
 		{
-			logger.error(e,e);
-			sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500,  "No se pudo realizar el proceso, inténtelo más tarde"); 
+			logger.error(e.getMessage());
+			throwNoControlledError = false;
+			sendErrorInfo(resp, e.getStatus(), e.getMessage());
+		
+		}catch (Exception e) 
+		{
+			throwNoControlledError = false;
+			logger.error(e.getMessage());
+			
+			if(e.getCause() != null && e.getCause() instanceof AuthSecurityException) {
+				sendErrorInfo(resp, ((AuthSecurityException)e.getCause()).getStatus(), ((AuthSecurityException)e.getCause()).getMessage());
+			}else {
+				
+				if(e.getCause() != null && ObjectContainer.instance().containsException(e.getCause())){
+					sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getCause().getMessage());
+				}else if(ObjectContainer.instance().containsException(e)){
+					sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getMessage());
+				}else {
+					sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500,  "No se pudo realizar el proceso, inténtelo más tarde"); 
+				}
+			}
+			
 		}finally {
 			SecurityContent.instance().clear();
 			if(throwNoControlledError)
@@ -83,7 +105,7 @@ public class ExceptionFilter implements Filter
 	
 	private void processException(HttpServletResponse resp, CustomServletException e) throws ServletException {
 		
-		if(ObjectContainer.instance().containsException(e.getCause())){
+		if(ObjectContainer.instance().containsException(e)){
 			
 			if(e.getStatus() > 0) {
 				sendErrorInfo(resp, e.getStatus(), e.getCause().getMessage());
@@ -91,17 +113,22 @@ public class ExceptionFilter implements Filter
 				sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getCause().getMessage());
 			}
 			
-		}else {
-			sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500, "No se pudo realizar el proceso, int�ntelo más tarde");
+		}else if(e.getCause() != null && ObjectContainer.instance().containsException(e)){
+			sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getCause().getMessage());
+			
+		}else{
+			sendErrorInfo(resp, HttpStatus.INTERNAL_SERVER_ERROR_500, "No se pudo realizar el proceso, inténtelo más tarde");
 		}  
 	}	
 	
 	private void sendErrorInfo(HttpServletResponse resp, int status, String msg) { 
 		try {
-			ResponseUtil.createResponse(resp, status, msg);
+			logger.error("ERROR STATUS->" + status);
+			logger.error("ERROR MESSAGE->" + msg);
+			ResponseUtil.setResponseError(resp, status, msg);
 		
-		} catch (CustomServletException e) { 
-			logger.error(e);
+		} catch (IOException e) { 
+			logger.error(e.getMessage());
 			resp.setStatus(status);
 		} 
 	}

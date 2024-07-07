@@ -19,7 +19,7 @@
 package org.platkmframework.core.request.exception;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.util.error.annotations.ResponseStatus;
+import org.platkmframework.annotation.ResponseStatus;
 
 
 /**

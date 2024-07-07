@@ -18,6 +18,7 @@
  *******************************************************************************/
 package org.platkmframework.core.rmi;
 
+import java.rmi.NoSuchObjectException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -28,23 +29,21 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.platkmframework.annotation.rmi.RMIServer;
-import org.platkmframework.content.ioc.ObjectContainer;
+import org.platkmframework.content.ObjectContainer;
 import org.platkmframework.content.project.ProjectContent;
 
 
 public class RMIServerManager {
 	
-	private static final Logger logger = LogManager.getLogger(RMIServerManager.class);
-	
 	private static RMIServerManager schedulerManager;
  
-	Map<String, Object> map;
+	Map<String, Remote> map;
+	Map<String, Remote> running;
 	
 	private RMIServerManager() { 
 		map = new HashMap<>();
+		running = new HashMap<>();
 	}
 	
 	public static RMIServerManager instance() {
@@ -64,6 +63,9 @@ public class RMIServerManager {
 			Remote stub = (Remote) UnicastRemoteObject.exportObject((Remote)rmiServerObj,Integer.valueOf(port));
 			Registry registry = LocateRegistry.createRegistry(8087);
 			registry.rebind(name, stub);
+			
+			running.put(name, (Remote)rmiServerObj);
+			 map.remove(name);
 			
 		} catch (RemoteException e) { 
 			throw new RMIException(e);
@@ -90,8 +92,9 @@ public class RMIServerManager {
 					Remote stub = (Remote) UnicastRemoteObject.exportObject((Remote)rmiServerObj,Integer.valueOf(port));
 					Registry registry = LocateRegistry.createRegistry(8087);
 					registry.rebind(name, stub);
+					running.put(name, (Remote)rmiServerObj); 
 				}else {
-					map.put(name, rmiServerObj);
+					map.put(name, (Remote)  rmiServerObj);
 				}
 			}
 			
@@ -99,11 +102,22 @@ public class RMIServerManager {
 			throw new RMIException(e);
 		}
 			
-			
 	} 
 	
 	private boolean isRunOnStart(String runOnStart) {
 		return StringUtils.isNotBlank(runOnStart) && Boolean.TRUE.toString().toLowerCase().equals(runOnStart.toLowerCase().trim());
+	}
+	
+	public void stopService(String name) throws RMIException{
+		try {
+			UnicastRemoteObject.unexportObject(running.get(name), true);
+			
+			map.put(name, running.get(name));
+			running.remove(name);
+			 
+		} catch (NoSuchObjectException e) {
+			throw new RMIException(e);
+		}
 	}
 	
 }

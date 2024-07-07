@@ -16,10 +16,12 @@
  * Contributors:
  * 	Eduardo Iglesias Taylor - initial API and implementation
  *******************************************************************************/
-package org.platkmframework.core.request.exception;
+package org.platkmframework.comon.service.exception;
+ 
 
-import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.annotation.ResponseStatus;
+import org.platkmframework.annotation.TruslyException;
+
+import jakarta.servlet.ServletException;
 
 
 /**
@@ -28,14 +30,41 @@ import org.platkmframework.annotation.ResponseStatus;
  *   Contributors: 
  *   	Eduardo Iglesias - initial API and implementation
  **/
-@ResponseStatus(status = HttpStatus.FORBIDDEN_403)
-public class ResourcePermissionException extends Exception {
- 
+@TruslyException
+public class CustomServletException extends ServletException {
+
 	private static final long serialVersionUID = 1L;
-  
-	public ResourcePermissionException(String message) {
+	
+	private int status =  -1;
+ 
+	public CustomServletException() {
+		super(); 
+	}
+	
+	public CustomServletException(String message) {
 		super(message); 
 	}
- 	
+	
+	public CustomServletException(int status, String message) { 
+		super(message);
+		this.status = status;
+	}
+
+	public CustomServletException(String message, Throwable rootCause) {
+		super(message, rootCause); 
+		
+		if(rootCause instanceof StatusException)
+			this.status = ((StatusException)rootCause).getStatus();
+	}
+	 
+
+	public int getStatus() {
+		return status;
+	}
+
+	public void setStatus(int status) {
+		this.status = status;
+	}
+
 
 }

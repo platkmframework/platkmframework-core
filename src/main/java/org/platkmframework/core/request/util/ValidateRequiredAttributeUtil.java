@@ -75,7 +75,7 @@ public class ValidateRequiredAttributeUtil {
 					}
 				}catch (IllegalAccessException e )
 				{
-					throw new ResourceNotFoundException("The attribute validation could not be completed:" + field.getName());
+					throw new ResourceNotFoundException("The attribute validation could not be completed: " + field.getName());
 				}	
 			}
 		}

@@ -33,19 +33,18 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.platkmframework.annotation.timer.TimerFixeDelayScheduler;
 import org.platkmframework.annotation.timer.TimerFixeRateScheduler;
 import org.platkmframework.annotation.timer.TimerScheduler;
-import org.platkmframework.content.ioc.BeanMethodInfo;
-import org.platkmframework.content.ioc.ObjectContainer;
-import org.platkmframework.content.project.CorePropertyConstant;
+import org.platkmframework.content.ObjectContainer;
 import org.platkmframework.content.project.ProjectContent;
+import org.platkmframework.doi.data.BeanMethodInfo;
 
 public class SchedulerManager {
 	
-	private static final Logger logger = LogManager.getLogger(SchedulerManager.class);
+	private static Logger logger = LoggerFactory.getLogger(SchedulerManager.class);
 	
 	private static final String C_DATE_TIME_NOW = "now";
 	
@@ -122,7 +121,7 @@ public class SchedulerManager {
 		
 		long delayValue = StringUtils.isNotBlank(delay)?Long.valueOf(delay):0;
 		if(StringUtils.isNotBlank(time)){ 
-			if(StringUtils.isBlank(timeformat)) timeformat = ProjectContent.instance().getProperty(CorePropertyConstant.ORG_PLATKMFRAMEWORK_FORMAT_DATETIME);
+			if(StringUtils.isBlank(timeformat)) timeformat = ProjectContent.instance().getDateTimeFormat();
 				 
 				try {
 					DateFormat formatter = new SimpleDateFormat(timeformat);
@@ -134,16 +133,16 @@ public class SchedulerManager {
 						@Override
 						public void run() {
 							try {
-								wait(System.currentTimeMillis()+delayValue);
-								method.invoke(obj, null);
+								Thread.sleep(delayValue);
+								method.invoke(obj);
 							} catch (IllegalAccessException | InvocationTargetException | InterruptedException e) { 
-								logger.error(e); 
+								logger.error(e.getMessage()); 
 							} 
 						}
 					}
 					, date);
 				} catch (ParseException e) {
-					logger.error(e);
+					logger.error(e.getMessage());
 				} 
 		}else{ 
 			
@@ -152,9 +151,9 @@ public class SchedulerManager {
 				@Override
 				public void run() {
 					try {
-						method.invoke(obj, null);
+						method.invoke(obj);
 					} catch (IllegalAccessException | InvocationTargetException e) { 
-						logger.error(e); 
+						logger.error(e.getMessage()); 
 					} 
 				}
 			}
@@ -162,8 +161,6 @@ public class SchedulerManager {
 		}
 	}
  
-
-
 	protected void runTimerFixedRateScheduler(Object obj, Method method) {
 		TimerFixeRateScheduler timerFixeDelayScheduler = method.getAnnotation(TimerFixeRateScheduler.class);
 		String firtTime   = ProjectContent.instance().parseValue(timerFixeDelayScheduler.firstTime()); 
@@ -172,10 +169,10 @@ public class SchedulerManager {
 		String delay 	  = ProjectContent.instance().parseValue(timerFixeDelayScheduler.delay());
 		
 		long delayValue = StringUtils.isNotBlank(delay)?Long.valueOf(delay):0;
-		long periodValue = StringUtils.isNotBlank(delay)?Long.valueOf(period):0;
+		long periodValue = StringUtils.isNotBlank(period)?Long.valueOf(period):0;
 		
 		if(StringUtils.isNotBlank(firtTime)){ 
-			if(StringUtils.isBlank(timeformat)) timeformat = ProjectContent.instance().getProperty(CorePropertyConstant.ORG_PLATKMFRAMEWORK_FORMAT_DATETIME);
+			if(StringUtils.isBlank(timeformat)) timeformat = ProjectContent.instance().getDateTimeFormat();
 			
 			try {
 				DateFormat formatter = new SimpleDateFormat(timeformat);
@@ -186,17 +183,17 @@ public class SchedulerManager {
 					@Override
 					public void run() {
 						try {
-							wait(System.currentTimeMillis()+delayValue);
-							method.invoke(obj, null);
+							Thread.sleep(delayValue);
+							method.invoke(obj);
 						} catch (IllegalAccessException | InvocationTargetException | InterruptedException e) { 
-							logger.error(e); 
+							logger.error(e.getMessage()); 
 						} 
 					}
 				}
 				, date, periodValue); 
 			
 			} catch (ParseException e) {
-				logger.error(e); 
+				logger.error(e.getMessage()); 
 			} 
 		}else {
 			
@@ -204,11 +201,11 @@ public class SchedulerManager {
 				
 				@Override
 				public void run() {
-					try {
-						wait(System.currentTimeMillis()+delayValue);
-						method.invoke(obj, null);
+					try { 
+						Thread.sleep(delayValue);
+						method.invoke(obj);
 					} catch (IllegalAccessException | InvocationTargetException | InterruptedException e) { 
-						logger.error(e); 
+						logger.error(e.getMessage()); 
 					} 
 				}
 			}
@@ -226,7 +223,7 @@ public class SchedulerManager {
 		String delay 	  = ProjectContent.instance().parseValue(timerFixeDelayScheduler.delay());
 		
 		long delayValue  = StringUtils.isNotBlank(delay)?Long.valueOf(delay):0;
-		long periodValue = StringUtils.isNotBlank(delay)?Long.valueOf(period):0;
+		long periodValue = StringUtils.isNotBlank(period)?Long.valueOf(period):0;
 		
 		if(StringUtils.isNotBlank(firtTime)){
 			try {
@@ -235,7 +232,7 @@ public class SchedulerManager {
 					date = new Date();
 				}else {
 					if(StringUtils.isBlank(timeformat)) { 
-							timeformat = ProjectContent.instance().getProperty(CorePropertyConstant.ORG_PLATKMFRAMEWORK_FORMAT_DATETIME);
+							timeformat = ProjectContent.instance().getDateTimeFormat();
 						}
 						DateFormat formatter = new SimpleDateFormat(timeformat);
 						date = formatter.parse(firtTime);
@@ -246,17 +243,17 @@ public class SchedulerManager {
 					@Override
 					public void run() {
 						try {
-							wait(System.currentTimeMillis() + delayValue);
-							method.invoke(obj, null);
+							Thread.sleep(delayValue);
+							method.invoke(obj);
 						} catch (IllegalAccessException | InvocationTargetException | InterruptedException e) { 
-							logger.error(e); 
+							logger.error(e.getMessage()); 
 						} 
 					}
 				}
 				, date, periodValue); 
 			
 			} catch (ParseException e) {
-				logger.error(e); 
+				logger.error(e.getMessage()); 
 			} 
 		}else {
 			
@@ -265,9 +262,9 @@ public class SchedulerManager {
 				@Override
 				public void run() {
 					try { 
-						method.invoke(obj, null);
+						method.invoke(obj);
 					} catch (IllegalAccessException | InvocationTargetException  e) { 
-						logger.error(e); 
+						logger.error(e.getMessage()); 
 					} 
 				}
 			}

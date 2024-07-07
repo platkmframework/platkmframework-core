@@ -19,7 +19,7 @@
 package org.platkmframework.core.request.exception;
 
 import org.eclipse.jetty.http.HttpStatus;
-import org.platkmframework.util.error.annotations.ResponseStatus;
+import org.platkmframework.annotation.ResponseStatus;
 
 
 /**
@@ -28,6 +28,7 @@ import org.platkmframework.util.error.annotations.ResponseStatus;
  *   Contributors: 
  *   	Eduardo Iglesias - initial API and implementation
  **/
+
 @ResponseStatus(status = HttpStatus.NOT_FOUND_404)
 public class ResourceNotFoundException extends Exception {
  

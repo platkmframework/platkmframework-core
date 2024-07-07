@@ -24,12 +24,12 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RMIClientProvider{
 	
-	private static final Logger logger = LogManager.getLogger(RMIClientProvider.class);
+	private static Logger logger = LoggerFactory.getLogger(RMIClientProvider.class);
 	 
 	private String hostname;
 	private String port;
@@ -60,7 +60,7 @@ public class RMIClientProvider{
 			return client.cast(registry.lookup(lookupName));
 			
 		}catch(RemoteException | NotBoundException | IllegalArgumentException e) {
-			logger.error(e);
+			logger.error(e.getMessage());
 			throw new RMIException(e); 
 		}
 	}

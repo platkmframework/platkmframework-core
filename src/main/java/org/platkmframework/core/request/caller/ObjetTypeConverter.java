@@ -34,22 +34,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.fileupload2.core.FileUploadException;
 import org.apache.commons.lang3.StringUtils;
 import org.platkmframework.annotation.UIFilterToSearchConverter;
 import org.platkmframework.annotation.exception.UIFilterToSearchConverterException;
+import org.platkmframework.common.domain.filter.converter.UIFilterToSearchCriteriaConverter;
 import org.platkmframework.common.domain.filter.criteria.FilterCriteria;
 import org.platkmframework.common.domain.filter.criteria.SearchCriteria;
 import org.platkmframework.common.domain.filter.criteria.WhereCriteria;
 import org.platkmframework.common.domain.filter.ui.Filter;
 import org.platkmframework.comon.service.exception.ServiceException;
 import org.platkmframework.comon.service.validator.ValidatorUtil;
-import org.platkmframework.content.ioc.ObjectContainer;
-import org.platkmframework.core.domain.base.converter.UIFilterToSearchCriteriaConverter;
+import org.platkmframework.content.ObjectContainer;
+import org.platkmframework.content.json.JsonUtil;
 import org.platkmframework.core.request.exception.ResourceNotFoundException;
 import org.platkmframework.core.request.multipart.MultiPart;
 import org.platkmframework.util.JsonException;
-import org.platkmframework.util.JsonUtil;
 import org.platkmframework.util.Util;
 import org.platkmframework.util.error.InvocationException;
 import org.platkmframework.util.reflection.ReflectionUtil;
@@ -170,7 +169,7 @@ public class ObjetTypeConverter
 		{
 			String strBody = Util.inputSteamToString(req.getInputStream());
 			if(StringUtils.isBlank(strBody))
-				if(required) throw new ResourceNotFoundException("required field value not found"); else return null;
+				if(required) throw new ResourceNotFoundException("required value not found for field : " + parameter.getName()); else return null;
 			
 			if(uiFilterToSearchConverter != null) {
 				UIFilterToSearchConverter uIFilterToSearchConverter =(UIFilterToSearchConverter) ObjectContainer.instance().geApptScopeObj(uiFilterToSearchConverter);
@@ -191,21 +190,21 @@ public class ObjetTypeConverter
 			}else if(parameter.getType().equals(SearchCriteria.class)){
 				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
 				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToSearchCriteria(filter, filter.getCode());
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToSearchCriteria(filter);
 				ValidatorUtil.checkValidation(objBean);
 				return objBean;
 			
 			}else if(parameter.getType().equals(FilterCriteria.class)){
 				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
 				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToFilterCriteria(filter, filter.getCode());
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToFilterCriteria(filter);
 				ValidatorUtil.checkValidation(objBean);
 				return objBean;
 			
 			}else if(parameter.getType().equals(WhereCriteria.class)){
 				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
 				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToQueryCriteria(filter, filter.getCode());
+				Object objBean = uiFilterToSearchCriteriaConverter.convertToQueryCriteria(filter);
 				ValidatorUtil.checkValidation(objBean);
 				return objBean;
 			
@@ -248,7 +247,7 @@ public class ObjetTypeConverter
 		else
 		{
 			if(!List.class.equals(field.getType()))
-				throw new ResourceNotFoundException("Data type->" + field.getType() + " not supported from page request");
+				throw new ResourceNotFoundException( "Field name: " + field .getName() + " Data type->" + field.getType() + " not supported from page request");
 			_processAttributeList(htmlFieldName, obj, field, param, req); 
 		}
 		 
@@ -268,7 +267,7 @@ public class ObjetTypeConverter
 		//if empty value
 		if( value == null || StringUtils.isEmpty(value.toString()) )
 		  if(required)
-			  throw new ResourceNotFoundException("El valor para el parámetro " + customParamName + "es requerido");
+			  throw new ResourceNotFoundException("El valor para el parámetro " + customParamName + " es requerido");
 		  else
 			  return null;
 	
@@ -293,7 +292,7 @@ public class ObjetTypeConverter
 		else if(String.class.equals(type))
 			return new String(value.toString()); 
 		else
-			throw new ResourceNotFoundException("Data type->" + type + " not found to convert");
+			throw new ResourceNotFoundException("Name " + customParamName + "Data type->" + type + " not found to convert");
 	}
 
 
@@ -336,7 +335,7 @@ public class ObjetTypeConverter
 			else if(genericType.getClass().equals(Boolean.class)) 
 				return _fillByClassType(result, parameterValues, Boolean.class);
 			else 
-				throw new ResourceNotFoundException("The class type-> " + genericType.getClass().getName() + " is not included to process");
+				throw new ResourceNotFoundException("Name :" + htmlFieldName + " The class type-> " + genericType.getClass().getName() + " is not included to process");
 		}else
 		{
 		  return _fillByComplexTable(htmlFieldName, req, obj,field, genericType.getClass());

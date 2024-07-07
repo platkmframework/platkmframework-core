@@ -21,7 +21,6 @@ package org.platkmframework.core.request.caller;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.apache.commons.fileupload2.jakarta.JakartaServletFileUpload;
 import org.platkmframework.core.request.multipart.MultiPart;
 
 import jakarta.servlet.ServletException;
@@ -54,25 +53,20 @@ public class MultiparReader
 	public static MultiPart read(HttpServletRequest req) throws ServletException, IOException
 	{
 		MultiPart multiPart = null;
-		
-	 	if (JakartaServletFileUpload.isMultipartContent(req))
-		{ 
-	 	 
-	 		Collection<Part> fileParts = req.getParts();
-	 		
-		    if (fileParts != null && fileParts.size() > 0) 
-		    {
-		    	multiPart = new MultiPart();
-		        for (Part item : fileParts) 
-	        		multiPart.add(item.getName(), 
-	        					  item.getSubmittedFileName(),
-	        					  item.getContentType(), 
-	        					  item.getSize(),
-	        					  item.getInputStream()); 
-		        	 
-		        return multiPart;
-		    }
-		}
+ 		Collection<Part> fileParts = req.getParts();
+ 		
+	    if (fileParts != null && !fileParts.isEmpty()) 
+	    {
+	    	multiPart = new MultiPart();
+	        for (Part item : fileParts) 
+        		multiPart.add(item.getName(), 
+        					  item.getSubmittedFileName(),
+        					  item.getContentType(), 
+        					  item.getSize(),
+        					  item.getInputStream()); 
+	        	 
+	        return multiPart;
+	    }
 		 
 		return multiPart;
 	}

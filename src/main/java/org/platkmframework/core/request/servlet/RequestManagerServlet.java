@@ -18,9 +18,6 @@
  *******************************************************************************/
 package org.platkmframework.core.request.servlet;
 
-import java.io.IOException;
-
-import org.platkmframework.core.request.exception.CustomServletException;
 import org.platkmframework.core.request.manager.HttpRequestManager;
 import org.platkmframework.security.content.XSSRequestWrapper;
 
@@ -47,22 +44,26 @@ public class RequestManagerServlet extends HttpServlet{
 	private static final long serialVersionUID = 1L;
 
 	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException{
 		process(req,resp);
 	}
 	
 	@Override
-	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException{
 		process(req,resp);
 	}
 	
+	@Override
+	protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException{ 
+		process(req,resp);
+	}
 	
 	@Override
-	protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException { 
+	protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException{ 
 		process(req,resp);
 	}
 
-	private void process(HttpServletRequest request, HttpServletResponse response) throws CustomServletException 
+	private void process(HttpServletRequest request, HttpServletResponse response) throws ServletException 
 	{ 
 
 		   XSSRequestWrapper xssReq = new XSSRequestWrapper(request);

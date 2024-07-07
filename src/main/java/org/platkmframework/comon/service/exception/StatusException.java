@@ -16,9 +16,7 @@
  * Contributors:
  * 	Eduardo Iglesias Taylor - initial API and implementation
  *******************************************************************************/
-package org.platkmframework.core.response.util;
-
-import java.io.Serializable;
+package org.platkmframework.comon.service.exception;
 
 
 /**
@@ -27,52 +25,10 @@ import java.io.Serializable;
  *   Contributors: 
  *   	Eduardo Iglesias - initial API and implementation
  **/
-public class ResponseData implements Serializable{
+public interface StatusException {
+	 
+	public int getStatus();
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -6572841065562614624L;
-	
-	private Object data;
-	private int status;
-	private String message;
-	
-	
-	public ResponseData(Object data, int status, String message) {
-		super();
-		this.data = data;
-		this.status = status;
-		this.message = message;
-	}
-	
-	public ResponseData(int status, String message) {
-		super();
-		this.data = null;
-		this.status = status;
-		this.message = message;
-	}
-	
-	
-	public Object getData() {
-		return data;
-	}
-	public void setData(Object data) {
-		this.data = data;
-	}
-	public int getStatus() {
-		return status;
-	}
-	public void setStatus(int status) {
-		this.status = status;
-	}
-	public String getMessage() {
-		return message;
-	}
-	public void setMessage(String message) {
-		this.message = message;
-	}
-	
-	
+	public void setStatus(int status);
 
 }

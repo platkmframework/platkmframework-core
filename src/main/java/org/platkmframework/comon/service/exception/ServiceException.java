@@ -16,12 +16,9 @@
  * Contributors:
  * 	Eduardo Iglesias Taylor - initial API and implementation
  *******************************************************************************/
-package org.platkmframework.core.request.exception;
- 
+package org.platkmframework.comon.service.exception;
 
-import org.platkmframework.comon.service.exception.StatusException;
-
-import jakarta.servlet.ServletException;
+import org.platkmframework.annotation.TruslyException; 
 
 
 /**
@@ -30,28 +27,24 @@ import jakarta.servlet.ServletException;
  *   Contributors: 
  *   	Eduardo Iglesias - initial API and implementation
  **/
-public class CustomServletException extends ServletException {
+@TruslyException
+public class ServiceException extends Exception implements StatusException {
 
+	/**
+	 * 
+	 */
 	private static final long serialVersionUID = 1L;
-	
-	private int status =  -1;
- 
-	public CustomServletException() {
-		super(); 
-	}
-	
-	public CustomServletException(int status, String message) { 
-		super(message);
-		this.status = status;
-	}
 
-	public CustomServletException(Throwable rootCause) {
-		super(rootCause); 
-		
-		if(rootCause instanceof StatusException)
-			this.status = ((StatusException)rootCause).getStatus();
+	public int status = -1;
+	
+	public ServiceException(int status, String arg0) {
+		super(arg0); 
+		this.status = status; 
 	}
-	 
+	
+	public ServiceException(String arg0) {
+		super(arg0);  
+	}
 
 	public int getStatus() {
 		return status;
@@ -60,6 +53,7 @@ public class CustomServletException extends ServletException {
 	public void setStatus(int status) {
 		this.status = status;
 	}
-
+	
+	
 
 }

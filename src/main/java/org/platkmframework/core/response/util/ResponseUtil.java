@@ -18,14 +18,17 @@
  *******************************************************************************/
 package org.platkmframework.core.response.util;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 
-import org.platkmframework.core.request.exception.CustomServletException;
+import org.platkmframework.comon.service.exception.CustomServletException;
+import org.platkmframework.content.json.JsonUtil;
 import org.platkmframework.core.request.exception.RequestProcessException;
-import org.platkmframework.util.JsonUtil;
+import org.platkmframework.util.FTPUploadFileUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.http.HttpServletResponse;
-
 
 /**
  *   Author: 
@@ -34,21 +37,20 @@ import jakarta.servlet.http.HttpServletResponse;
  *   	Eduardo Iglesias - initial API and implementation
  **/
 public class ResponseUtil {
+	
+	private static Logger logger = LoggerFactory.getLogger(ResponseUtil.class);
 	 
 	public static void createResponse(HttpServletResponse resp, int status, String message) throws CustomServletException { 
 		_createResponse(resp, null, status, message); 
 	}
 	
-	
-	
-	public static void createResponse(HttpServletResponse resp, Object data, int status, String message) throws CustomServletException {
+	public static  void createResponse(HttpServletResponse resp, Object data, int status, String message) throws CustomServletException {
 		_createResponse(resp, data, status, message);
 	}
 	
 	public static void createResponse(HttpServletResponse resp, Object data, int status) throws CustomServletException {
 		_createResponse(resp, data, status, null);
 	}
-	
 	
 	private static void _createResponse(HttpServletResponse resp, Object object, int status, String message) throws CustomServletException {
 		
@@ -58,24 +60,27 @@ public class ResponseUtil {
 			
 			String json;
 			if(object != null) {
-				json = JsonUtil.objectToJson(new ResponseData(object, status, message));
-			}else {
-				json = JsonUtil.objectToJson(new ResponseData(status, message));
+				json = JsonUtil.objectToJson(object);
+				//resp.setContentLength(json.length());
+				PrintWriter out = resp.getWriter();
+				out.println(json);
+				out.flush(); 
 			}
-			PrintWriter out = resp.getWriter();
-			out.println(json);
-			out.flush(); 
-			
-			//resp.setContentLength(json.length());
 			resp.setStatus(status);
 			
 		} catch (Exception e) {
+			logger.error(e.getMessage());
 			throwError( "No se pudo realizar el proceso, inténtelo más tarde"); 
 		}
 		 
 	}
-
+ 
 	public static  void throwError(String msg) throws CustomServletException { 
-		throw new CustomServletException(new RequestProcessException(msg)); 
+		throw new CustomServletException(msg); 
+	}
+	
+	public static  void setResponseError(HttpServletResponse resp, int status,String msg) throws IOException { 
+		resp.setContentType("text/plain");
+		resp.sendError(status, msg);
 	}
 }
