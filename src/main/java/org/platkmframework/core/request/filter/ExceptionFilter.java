@@ -108,9 +108,9 @@ public class ExceptionFilter implements Filter
 		if(ObjectContainer.instance().containsException(e)){
 			
 			if(e.getStatus() > 0) {
-				sendErrorInfo(resp, e.getStatus(), e.getCause().getMessage());
+				sendErrorInfo(resp, e.getStatus(), e.getMessage());
 			}else {
-				sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getCause().getMessage());
+				sendErrorInfo(resp, HttpStatus.BAD_REQUEST_400, e.getMessage());
 			}
 			
 		}else if(e.getCause() != null && ObjectContainer.instance().containsException(e)){

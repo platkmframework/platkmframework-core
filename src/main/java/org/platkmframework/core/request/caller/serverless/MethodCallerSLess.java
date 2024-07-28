@@ -18,29 +18,25 @@
  *******************************************************************************/
 package org.platkmframework.core.request.caller.serverless;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.text.ParseException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.platkmframework.annotation.Service;
 import org.platkmframework.annotation.exception.UIFilterToSearchConverterException;
 import org.platkmframework.comon.service.exception.ServiceException;
 import org.platkmframework.content.ObjectContainer;
 import org.platkmframework.core.request.caller.ObjetTypeConverter;
-import org.platkmframework.core.request.exception.ResourceNotFoundException;
+import org.platkmframework.core.request.exception.RequestProcessException;
 import org.platkmframework.core.request.util.ValidateRequiredAttributeUtil;
-import org.platkmframework.util.JsonException;
 import org.platkmframework.util.error.InvocationException;
 import org.platkmframework.util.reflection.ReflectionUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -72,20 +68,20 @@ public class MethodCallerSLess
 	 * @throws UIFilterToSearchConverterException
 	 */
 	public Object execute(String path,
-			  HttpServletRequest req, HttpServletResponse resp) throws  ServiceException, UIFilterToSearchConverterException{  
+			  HttpServletRequest req, HttpServletResponse resp) throws RequestProcessException{  
 			
 		 
 		logger.info("searching object from -> " + path  + " - " +  req.getMethod());
 		//String key = "{" + req.getMethod() + ":"  + path + "}";
 		Object fObject = ObjectContainer.instance().getFunctionals(); // PathProccesor.getSessionObjectByPath(path, req.getMethod());
 		if(fObject == null)
-			throw new ServiceException("recurso no encontrado - " + req.getRequestURL().toString());
+			throw new RequestProcessException("recurso no encontrado - " + req.getRequestURL().toString());
 		 
 		List<Method> methods = ReflectionUtil.getAllMethoddHeritage(fObject.getClass(),false); 
 		Method method = methods.stream().filter((m)-> m.getName().equals(path) && m.canAccess(fObject)).findFirst().orElse(null);
 		 
 		if(method == null)
-			throw new ServiceException("recurso no encontrado - " + req.getRequestURL().toString());
+			throw new RequestProcessException("recurso no encontrado - " + req.getRequestURL().toString());
 					
 		Map<String, Object> pathParameter = new HashMap<>();
 		return execute(fObject, method, pathParameter, req, resp);
@@ -99,11 +95,12 @@ public class MethodCallerSLess
 	 * @param req
 	 * @param resp
 	 * @return
+	 * @throws RequestProcessException 
 	 * @throws ServiceException
 	 * @throws UIFilterToSearchConverterException
 	 */
 	protected Object execute(Object obj, Method method , Map<String, Object> pathParameter,
-						  HttpServletRequest req, HttpServletResponse resp) throws  ServiceException, UIFilterToSearchConverterException{ 
+						  HttpServletRequest req, HttpServletResponse resp) throws RequestProcessException   { 
 		 
 		try {	
 			//checkAuthorizationPermission(apiMethodInfo, method);
@@ -141,11 +138,8 @@ public class MethodCallerSLess
 			
 			return ReflectionUtil.invokeMethod(obj, method, paramValue);
 
-		}catch(ServletException | InvocationException | ParseException | IOException | JsonException e) {
-			logger.error(e.getMessage());
-			throw new ServiceException("No se pudo realizar el proceso");
-		}catch( ResourceNotFoundException e) {
-			throw new ServiceException(e.getMessage());
-		}
+		}catch( InvocationException  e) {
+			throw new RequestProcessException(e);
+		} 
 	}
 }

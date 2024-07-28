@@ -28,10 +28,10 @@ import org.platkmframework.core.request.caller.serverless.MethodCallerSLess;
 import org.platkmframework.core.request.download.DownFileInfo;
 import org.platkmframework.core.request.download.FileDownload;
 import org.platkmframework.core.request.exception.RequestProcessException;
+import org.platkmframework.core.request.exception.ResourceNotFoundException;
+import org.platkmframework.core.request.exception.ResourcePermissionException;
 import org.platkmframework.core.request.multipart.MultipartFile;
 import org.platkmframework.core.response.util.ResponseUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,7 +47,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class HttpRequestManager{
  
 
-	private static Logger logger = LoggerFactory.getLogger(HttpRequestManager.class);
+	//private static Logger logger = LoggerFactory.getLogger(HttpRequestManager.class);
 	
 	int maxMemSize = 5000 * 1024;
 	int maxFileSize = 5000 * 1024;
@@ -102,13 +102,10 @@ public class HttpRequestManager{
 				object = methodCaller.execute(path, req, resp);
 			
 			_writeResponse(object, req, resp);
-			
-		} catch (RequestProcessException e) {
-			logger.error(e.getMessage());
-			throw new CustomServletException("", e.getCause());
-		} catch (Exception e) {
-			logger.error(e.getMessage());
-			throw new ServletException(e);
+			 
+		} catch (RequestProcessException e) { 
+			if(e.getCause() == null) throw  new ServletException(e.getMessage());;
+			throw new ServletException(e.getCause());
 		}
 		
 	}

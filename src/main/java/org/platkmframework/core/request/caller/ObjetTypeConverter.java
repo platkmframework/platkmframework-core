@@ -37,17 +37,17 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.platkmframework.annotation.UIFilterToSearchConverter;
 import org.platkmframework.annotation.exception.UIFilterToSearchConverterException;
-import org.platkmframework.common.domain.filter.converter.UIFilterToSearchCriteriaConverter;
-import org.platkmframework.common.domain.filter.criteria.FilterCriteria;
-import org.platkmframework.common.domain.filter.criteria.SearchCriteria;
-import org.platkmframework.common.domain.filter.criteria.WhereCriteria;
-import org.platkmframework.common.domain.filter.ui.Filter;
 import org.platkmframework.comon.service.exception.ServiceException;
 import org.platkmframework.comon.service.validator.ValidatorUtil;
 import org.platkmframework.content.ObjectContainer;
 import org.platkmframework.content.json.JsonUtil;
-import org.platkmframework.core.request.exception.ResourceNotFoundException;
+import org.platkmframework.core.request.exception.RequestProcessException; 
 import org.platkmframework.core.request.multipart.MultiPart;
+import org.platkmframework.persistence.filter.converter.UIFilterToSearchCriteriaConverter;
+import org.platkmframework.persistence.filter.criteria.FilterCriteria;
+import org.platkmframework.persistence.filter.criteria.SearchCriteria;
+import org.platkmframework.persistence.filter.criteria.WhereCriteria;
+import org.platkmframework.persistence.filter.ui.Filter;
 import org.platkmframework.util.JsonException;
 import org.platkmframework.util.Util;
 import org.platkmframework.util.error.InvocationException;
@@ -120,8 +120,10 @@ public class ObjetTypeConverter
 	 */
 	public static Object converParamValueToObjectType(String customParamName, boolean required, Parameter parameter,
 			HttpServletRequest req,
-			boolean isAttribute, Object paramValue) throws ParseException, ResourceNotFoundException, IOException, JsonException, InvocationException, ServletException, ServiceException 
-	{ 
+			boolean isAttribute, Object paramValue) throws RequestProcessException{
+		
+		try {
+			
 		if(parameter.getType().getName().startsWith("java.lang"))
 			return convertToJavaLang(customParamName, parameter.getType(), paramValue, required);
 		else if(isPrimitive(parameter.getType().getName()))
@@ -140,11 +142,14 @@ public class ObjetTypeConverter
 				return  JsonUtil.jsonToObject(strJson,parameter.getType());
 		}
 			
+		}catch (Exception e) {
+			throw new RequestProcessException(e);
+		}
 	}
 	 
-	private static Object covertToTimeObject(Class<?> type, Object value, boolean required) throws ResourceNotFoundException {
+	private static Object covertToTimeObject(Class<?> type, Object value, boolean required) throws RequestProcessException {
 		if( value == null || StringUtils.isEmpty(value.toString()) ) {
-			if(required) throw new ResourceNotFoundException("required  field value not found -> " + type.toString());
+			if(required) throw new RequestProcessException("required  field value not found -> " + type.toString());
 			else return null;
 		}
 		 
@@ -158,65 +163,68 @@ public class ObjetTypeConverter
 			return LocalTime.parse(value.toString(), DateTimeFormatter.ofPattern(ObjectContainer.instance().getPropertyValue("platform.format.time")));
 		}
 		
-		throw new ResourceNotFoundException(type.getName() +  " not implemented"); 
+		throw new RequestProcessException(type.getName() +  " not implemented"); 
 	}
 
-	public static Object converBodyValueToObjectType(Parameter parameter, boolean required, Class<? extends UIFilterToSearchConverter> uiFilterToSearchConverter, HttpServletRequest req) throws ResourceNotFoundException, IOException, ParseException, JsonException, ServletException, ServiceException {
+	public static Object converBodyValueToObjectType(Parameter parameter, boolean required, Class<? extends UIFilterToSearchConverter> uiFilterToSearchConverter, HttpServletRequest req) throws RequestProcessException  {
 		  
-		if( parameter.getType().equals(MultiPart.class)) 
-			return MultiparReader.read(req);
-		else
-		{
-			String strBody = Util.inputSteamToString(req.getInputStream());
-			if(StringUtils.isBlank(strBody))
-				if(required) throw new ResourceNotFoundException("required value not found for field : " + parameter.getName()); else return null;
+		try {
 			
-			if(uiFilterToSearchConverter != null) {
-				UIFilterToSearchConverter uIFilterToSearchConverter =(UIFilterToSearchConverter) ObjectContainer.instance().geApptScopeObj(uiFilterToSearchConverter);
-				 try {
-					
-					 return uIFilterToSearchConverter.convert(strBody, parameter);
+			if( parameter.getType().equals(MultiPart.class)) 
+				return MultiparReader.read(req);
+			else
+			{
+				String strBody = Util.inputSteamToString(req.getInputStream());
+				if(StringUtils.isBlank(strBody))
+					if(required) throw new RequestProcessException("required value not found for field : " + parameter.getName()); else return null;
 				
-				 } catch (UIFilterToSearchConverterException e) {
-					 throw new ServiceException(e.getMessage());
+				if(uiFilterToSearchConverter != null) {
+					UIFilterToSearchConverter uIFilterToSearchConverter =(UIFilterToSearchConverter) ObjectContainer.instance().geApptScopeObj(uiFilterToSearchConverter);
+						 try {
+							return uIFilterToSearchConverter.convert(strBody, parameter);
+						} catch (UIFilterToSearchConverterException e) {
+							throw new RequestProcessException(e);
+						}
+				}
+				
+				if(parameter.getType().equals(List.class) && parameter.getParameterizedType() instanceof ParameterizedType
+						&& ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments().length>0) {
+				
+					return JsonUtil.jsonToListObject(strBody, (Class) ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments()[0]);
+				
+				}else if(parameter.getType().equals(SearchCriteria.class)){
+					Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+					ValidatorUtil.checkValidation(filter);
+					Object objBean = uiFilterToSearchCriteriaConverter.convertToSearchCriteria(filter);
+					ValidatorUtil.checkValidation(objBean);
+					return objBean;
+				
+				}else if(parameter.getType().equals(FilterCriteria.class)){
+					Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+					ValidatorUtil.checkValidation(filter);
+					Object objBean = uiFilterToSearchCriteriaConverter.convertToFilterCriteria(filter);
+					ValidatorUtil.checkValidation(objBean);
+					return objBean;
+				
+				}else if(parameter.getType().equals(WhereCriteria.class)){
+					Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
+					ValidatorUtil.checkValidation(filter);
+					Object objBean = uiFilterToSearchCriteriaConverter.convertToQueryCriteria(filter);
+					ValidatorUtil.checkValidation(objBean);
+					return objBean;
+				
+				}else if(parameter.getType().getName().startsWith("java.lang"))
+					return convertToJavaLang(parameter.getName(), parameter.getType(), strBody, required);
+				
+				else {
+					Object objBean = JsonUtil.jsonToObject(strBody, parameter.getType());
+					ValidatorUtil.checkValidation(objBean);
+					return objBean;
 				}
 			}
-			
-			if(parameter.getType().equals(List.class) && parameter.getParameterizedType() instanceof ParameterizedType
-					&& ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments().length>0) {
-			
-				return JsonUtil.jsonToListObject(strBody, (Class) ((ParameterizedType)parameter.getParameterizedType()).getActualTypeArguments()[0]);
-			
-			}else if(parameter.getType().equals(SearchCriteria.class)){
-				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
-				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToSearchCriteria(filter);
-				ValidatorUtil.checkValidation(objBean);
-				return objBean;
-			
-			}else if(parameter.getType().equals(FilterCriteria.class)){
-				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
-				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToFilterCriteria(filter);
-				ValidatorUtil.checkValidation(objBean);
-				return objBean;
-			
-			}else if(parameter.getType().equals(WhereCriteria.class)){
-				Filter<?> filter = JsonUtil.jsonToObject(strBody, Filter.class);
-				ValidatorUtil.checkValidation(filter);
-				Object objBean = uiFilterToSearchCriteriaConverter.convertToQueryCriteria(filter);
-				ValidatorUtil.checkValidation(objBean);
-				return objBean;
-			
-			}else if(parameter.getType().getName().startsWith("java.lang"))
-				return convertToJavaLang(parameter.getName(), parameter.getType(), strBody, required);
-			
-			else {
-				Object objBean = JsonUtil.jsonToObject(strBody, parameter.getType());
-				ValidatorUtil.checkValidation(objBean);
-				return objBean;
-			}
-		}
+		}catch (ServletException | JsonException | IOException e) {
+			throw new RequestProcessException(e);
+		} 
 	}
 	
 	
@@ -236,18 +244,21 @@ public class ObjetTypeConverter
 	 */
 	public static  void converFieldValueToObjectType(String htmlFieldName,Field field, Object obj,
 							Map<String, Object> param,
-							HttpServletRequest req) throws ParseException, ResourceNotFoundException, 
-														   IOException, JsonException, InvocationException, ServiceException 
+							HttpServletRequest req) throws RequestProcessException
 	{ 
 		if(field.getType().getName().startsWith("java.lang"))
 		{
 			Object value = convertToJavaLang(htmlFieldName, field.getType(),param.get(htmlFieldName),false);
-			ReflectionUtil.setAttributeValue(obj, field, value, false);
+			try {
+				ReflectionUtil.setAttributeValue(obj, field, value, false);
+			} catch (InvocationException e) {
+				 throw new RequestProcessException(e);
+			}
 		}
 		else
 		{
 			if(!List.class.equals(field.getType()))
-				throw new ResourceNotFoundException( "Field name: " + field .getName() + " Data type->" + field.getType() + " not supported from page request");
+				throw new RequestProcessException( "Field name: " + field .getName() + " Data type->" + field.getType() + " not supported from page request");
 			_processAttributeList(htmlFieldName, obj, field, param, req); 
 		}
 		 
@@ -262,12 +273,12 @@ public class ObjetTypeConverter
 	 * @throws ParseException 
 	 * @throws ResourceNotFoundException 
 	 */
-	private static Object convertToJavaLang(String customParamName, Class<?> type, Object value, boolean required) throws ParseException, ResourceNotFoundException, ServiceException 
+	private static Object convertToJavaLang(String customParamName, Class<?> type, Object value, boolean required) throws RequestProcessException 
 	{
 		//if empty value
 		if( value == null || StringUtils.isEmpty(value.toString()) )
 		  if(required)
-			  throw new ResourceNotFoundException("El valor para el parámetro " + customParamName + " es requerido");
+			  throw new RequestProcessException("El valor para el parámetro " + customParamName + " es requerido");
 		  else
 			  return null;
 	
@@ -288,11 +299,15 @@ public class ObjetTypeConverter
 		else if(Boolean.class.equals(type))
 			return Boolean.valueOf(value.toString());
 		else if(Date.class.equals(type))
-			return Util.stringToDate(value.toString()); 
+			try {
+				return Util.stringToDate(value.toString());
+			} catch (ParseException e) {
+				throw new RequestProcessException(e);
+			}
 		else if(String.class.equals(type))
-			return new String(value.toString()); 
+			return value.toString(); 
 		else
-			throw new ResourceNotFoundException("Name " + customParamName + "Data type->" + type + " not found to convert");
+			throw new RequestProcessException("Name " + customParamName + "Data type->" + type + " not found to convert");
 	}
 
 
@@ -302,6 +317,7 @@ public class ObjetTypeConverter
 	 * @param type
 	 * @param param
 	 * @return
+	 * @throws RequestProcessException 
 	 * @throws ResourceNotFoundException 
 	 * @throws ParseException 
 	 * @throws InvocationException 
@@ -311,7 +327,7 @@ public class ObjetTypeConverter
 								Object obj,
 								Field field,
 								Map<String, Object> param, 
-								HttpServletRequest req) throws ResourceNotFoundException, ParseException, InvocationException, ServiceException 
+								HttpServletRequest req) throws RequestProcessException 
 	{
 	 	
 		Type t = field.getType().getGenericSuperclass();
@@ -335,7 +351,7 @@ public class ObjetTypeConverter
 			else if(genericType.getClass().equals(Boolean.class)) 
 				return _fillByClassType(result, parameterValues, Boolean.class);
 			else 
-				throw new ResourceNotFoundException("Name :" + htmlFieldName + " The class type-> " + genericType.getClass().getName() + " is not included to process");
+				throw new RequestProcessException("Name :" + htmlFieldName + " The class type-> " + genericType.getClass().getName() + " is not included to process");
 		}else
 		{
 		  return _fillByComplexTable(htmlFieldName, req, obj,field, genericType.getClass());
@@ -362,56 +378,64 @@ public class ObjetTypeConverter
 	 * @param parameterValues
 	 * @param class1 It suposed is a simple bean with simple contructor
 	 * @return
+	 * @throws RequestProcessException 
 	 * @throws InvocationException 
 	 * @throws ResourceNotFoundException 
 	 * @throws ParseException 
 	 * @throws ServiceException 
 	 */	
-	private static List<Object> _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws InvocationException, ParseException, ResourceNotFoundException, ServiceException 
+	private static List<Object> _fillByComplexTable(String htmlFieldName, HttpServletRequest req, Object obj ,  Field field, Class classBean) throws RequestProcessException 
 	{
-		List<Object>  list = (List ) ReflectionUtil.getAttributeValue(obj, field);
-		List<Field> fields = ReflectionUtil.getAllFieldHeritage(obj.getClass());
-		if(fields != null)
-		{ 
-			int row = 1; 
-			String htmlFielNameId = _getTableCellName(htmlFieldName, C_TABLE_NEW_ROW_CHECKER, row);
-			if (!req.getParameterMap().containsKey(htmlFielNameId))
-				return list;
+		try {
 			
-			//there are rows then check list
-			if(list == null)
-				list = (List)ReflectionUtil.createInstance(field.getClass());
-			
-			boolean exists = true; 
-			Object objRow;
-			Object value;
-			while (exists)
+		 
+			List<Object>  list = (List ) ReflectionUtil.getAttributeValue(obj, field);
+			List<Field> fields = ReflectionUtil.getAllFieldHeritage(obj.getClass());
+			if(fields != null)
 			{ 
-				if(StringUtils.isEmpty(htmlFielNameId))
-				{
-					//new record
-					objRow = ReflectionUtil.createInstance(classBean);
-					list.add(objRow);
-				}else 
-					objRow = list.get(_getCurrentRow(htmlFielNameId)); 
-				
-				for (int i = 0; i < fields.size(); i++) 
-				{ 
-					htmlFielNameId = _getTableCellName(htmlFieldName, fields.get(i+1).getName(), row);
-					if (req.getParameterMap().containsKey(htmlFielNameId))
-					{
-						value = convertToJavaLang(htmlFielNameId, fields.get(i+1).getType(), req.getParameter(htmlFielNameId), false);
-						ReflectionUtil.setAttributeValue(objRow, fields.get(i+1), value, false);
-					}
-				}
-				//next row
-				row++; 
-				htmlFielNameId = _getTableCellName(htmlFieldName, C_TABLE_NEW_ROW_CHECKER, row);
+				int row = 1; 
+				String htmlFielNameId = _getTableCellName(htmlFieldName, C_TABLE_NEW_ROW_CHECKER, row);
 				if (!req.getParameterMap().containsKey(htmlFielNameId))
-					return list;	
+					return list;
+				
+				//there are rows then check list
+				if(list == null)
+					list = (List)ReflectionUtil.createInstance(field.getClass());
+				
+				boolean exists = true; 
+				Object objRow;
+				Object value;
+				while (exists)
+				{ 
+					if(StringUtils.isEmpty(htmlFielNameId))
+					{
+						//new record
+						objRow = ReflectionUtil.createInstance(classBean);
+						list.add(objRow);
+					}else 
+						objRow = list.get(_getCurrentRow(htmlFielNameId)); 
+					
+					for (int i = 0; i < fields.size(); i++) 
+					{ 
+						htmlFielNameId = _getTableCellName(htmlFieldName, fields.get(i+1).getName(), row);
+						if (req.getParameterMap().containsKey(htmlFielNameId))
+						{
+							value = convertToJavaLang(htmlFielNameId, fields.get(i+1).getType(), req.getParameter(htmlFielNameId), false);
+							ReflectionUtil.setAttributeValue(objRow, fields.get(i+1), value, false);
+						}
+					}
+					//next row
+					row++; 
+					htmlFielNameId = _getTableCellName(htmlFieldName, C_TABLE_NEW_ROW_CHECKER, row);
+					if (!req.getParameterMap().containsKey(htmlFielNameId))
+						return list;	
+				}
 			}
+			return list;
+			
+		}catch (InvocationException e) {
+			throw new RequestProcessException(e);
 		}
-		return list;
 	}
   
 
@@ -441,10 +465,11 @@ public class ObjetTypeConverter
 	 * @param parameterValues
 	 * @param class1
 	 * @return
+	 * @throws RequestProcessException 
 	 * @throws ParseException
 	 * @throws ResourceNotFoundException
 	 */
-	private static List<Object> _fillByClassType(ArrayList<Object> list, String[] parameterValues, Class<?> class1) throws ParseException, ResourceNotFoundException 
+	private static List<Object> _fillByClassType(ArrayList<Object> list, String[] parameterValues, Class<?> class1) throws RequestProcessException 
 	{
 		for (int i = 0; i < parameterValues.length; i++)   
 			list.add(_getValue(parameterValues[i], class1)); 
@@ -460,7 +485,7 @@ public class ObjetTypeConverter
 	 * @throws ParseException
 	 * @throws ResourceNotFoundException
 	 */
-	private static Object _getValue(String value, Class<?> class1) throws ParseException, ResourceNotFoundException 
+	private static Object _getValue(String value, Class<?> class1) throws RequestProcessException 
 	{
 		if(class1.equals(Long.class))  
 			return Long.parseLong(value);
@@ -468,10 +493,14 @@ public class ObjetTypeConverter
 			return Integer.parseInt(value);
 		else if(class1.equals(Float.class)) 
 			return Float.parseFloat(value);
-		else if(class1.equals(Date.class)) 
-			return Util.stringToDate(value);
+		else if(class1.equals(Date.class))
+			try {
+				return Util.stringToDate(value);
+			} catch (ParseException e) {
+				throw new RequestProcessException(e);
+			}
 		else 
-			throw new ResourceNotFoundException("The class type-> " + class1.getClass().getName() + " is not included to process");
+			throw new RequestProcessException("The class type-> " + class1.getClass().getName() + " is not included to process");
 	
 	}
 

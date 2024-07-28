@@ -2,7 +2,7 @@ package org.platkmframework.comon.service.validator;
 
 import java.util.Set;
 
-import org.platkmframework.comon.service.exception.ServiceException;
+import org.platkmframework.core.request.exception.RequestProcessException;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -13,7 +13,7 @@ public class ValidatorUtil {
 	private static ValidatorFactory factory = null;
 	
 	
-	public static void checkValidation(Object objBean) throws ServiceException {
+	public static void checkValidation(Object objBean) throws RequestProcessException {
 		if(factory == null)
 			factory = Validation.byDefaultProvider().configure().buildValidatorFactory();
 		Set<ConstraintViolation<Object>> constraintViolations = factory.getValidator().validate(objBean);
@@ -24,7 +24,7 @@ public class ValidatorUtil {
 				msg+= coma + constraintViolation.getPropertyPath() + " " + constraintViolation.getMessage();
 				coma=", ";
 			}
-			throw new ServiceException(msg);
+			throw new RequestProcessException(msg);
 		}
 	}
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Whitelist;
 import org.platkmframework.annotation.BeanAttribute;
+import org.platkmframework.core.request.exception.RequestProcessException;
 import org.platkmframework.core.request.exception.ResourceNotFoundException;
 import org.platkmframework.util.reflection.ReflectionUtil;
 
@@ -38,7 +39,7 @@ import org.platkmframework.util.reflection.ReflectionUtil;
  **/
 public class ValidateRequiredAttributeUtil {
 
-	public static void validate(Object obj) throws ResourceNotFoundException { 
+	public static void validate(Object obj) throws RequestProcessException { 
 		
 		if(obj == null) return;
 		
@@ -46,8 +47,12 @@ public class ValidateRequiredAttributeUtil {
 			validateList((List)obj);
 		if(obj instanceof Map)
 			validateList((Map)obj);
-		else 
-			validateBean(obj);
+		else
+			try {
+				validateBean(obj);
+			} catch (ResourceNotFoundException e) {
+				throw new RequestProcessException(e);
+			}
 	}
 
 	private static void validateBean(Object obj) throws ResourceNotFoundException {
@@ -81,7 +86,7 @@ public class ValidateRequiredAttributeUtil {
 		}
 	}
 
-	private static void validateList(Map map)throws ResourceNotFoundException {
+	private static void validateList(Map map)throws RequestProcessException {
 		
 		if(map == null) return;
 		Iterator iterator = map.entrySet().iterator();
@@ -91,7 +96,7 @@ public class ValidateRequiredAttributeUtil {
 		
 	}
 
-	private static void validateList(List list) throws ResourceNotFoundException {
+	private static void validateList(List list) throws RequestProcessException {
 		if(list == null) return;
 		for (Object object : list)
 			validate(object);  

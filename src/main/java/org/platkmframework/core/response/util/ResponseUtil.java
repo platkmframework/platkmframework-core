@@ -23,8 +23,6 @@ import java.io.PrintWriter;
 
 import org.platkmframework.comon.service.exception.CustomServletException;
 import org.platkmframework.content.json.JsonUtil;
-import org.platkmframework.core.request.exception.RequestProcessException;
-import org.platkmframework.util.FTPUploadFileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

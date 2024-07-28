@@ -18,17 +18,14 @@
  *******************************************************************************/
 package org.platkmframework.core.request.caller;
 
-import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.platkmframework.annotation.HeaderParam;
 import org.platkmframework.annotation.RequestBody;
 import org.platkmframework.annotation.RequestParam;
@@ -43,9 +40,10 @@ import org.platkmframework.core.request.exception.ResourcePermissionException;
 import org.platkmframework.core.request.exception.UnKnowProcessRequestException;
 import org.platkmframework.core.request.util.ValidateRequiredAttributeUtil;
 import org.platkmframework.security.content.SecurityContent;
-import org.platkmframework.util.JsonException;
 import org.platkmframework.util.error.InvocationException;
 import org.platkmframework.util.reflection.ReflectionUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -74,75 +72,83 @@ public class MethodCaller
 	 * @throws ResourcePermissionException
 	 * @throws UnKnowProcessRequestException
 	 * @throws RequestProcessException
+	 * @throws InvocationException 
 	 * @throws ServletException
 	 * @throws ServiceException
 	 * @throws UIFilterToSearchConverterException
 	 */
 	
 	public Object execute(String path,
-			  HttpServletRequest req, HttpServletResponse resp) throws ResourceNotFoundException, ResourcePermissionException, UnKnowProcessRequestException, RequestProcessException, ServletException, ServiceException, UIFilterToSearchConverterException{  
+			  HttpServletRequest req, HttpServletResponse resp) throws RequestProcessException{  
 			
-		 
-		logger.info("searching object from -> " + path  + " - " +  req.getMethod());
-		//String key = "{" + req.getMethod() + ":"  + path + "}";
-		
-		Object controller;
-		Map<String, Object> pathParameter = new HashMap<>();
-		
-		String apiControllerMethodInfo = ObjectContainer.instance().getApiControllerInfo(path + "-" + req.getMethod().toLowerCase()); // PathProccesor.getSessionObjectByPath(path, req.getMethod());
-		if(StringUtils.isNotBlank(apiControllerMethodInfo)){
+		try {
 			
-			String[] controlllerMethod = apiControllerMethodInfo.split("-");
-			controller = ObjectContainer.instance().getController(controlllerMethod[0]);
+			logger.info("searching object from -> " + path  + " - " +  req.getMethod());
+			//String key = "{" + req.getMethod() + ":"  + path + "}";
+			
+			Object controller;
+			Map<String, Object> pathParameter = new HashMap<>();
+			
+			String apiControllerMethodInfo = ObjectContainer.instance().getApiControllerInfo(path + "-" + req.getMethod().toLowerCase()); // PathProccesor.getSessionObjectByPath(path, req.getMethod());
+			if(StringUtils.isNotBlank(apiControllerMethodInfo)){
+				
+				String[] controlllerMethod = apiControllerMethodInfo.split("-");
+				controller = ObjectContainer.instance().getController(controlllerMethod[0]);
+				
+				return execute(controller, ReflectionUtil.getMethodByNameAndHeritage(controller.getClass(), controlllerMethod[1], true), pathParameter, req, resp);
+			
+			}else{
+			
+				List<String> fullPathVarialbeApiNameList = ObjectContainer.instance().getApiPathVariable(req.getMethod().toLowerCase()  + "-" + path.split("/").length );
 			 
-			return execute(controller, ReflectionUtil.getMethodByNameAndHeritage(controller.getClass(), controlllerMethod[1], true), pathParameter, req, resp);
+				if(fullPathVarialbeApiNameList != null && !fullPathVarialbeApiNameList.isEmpty()) {
+					//path variable
+					String[] arrayPath = path.split("/");
+					String[] arrayMethodPath;
+					Parameter[] parameters;
+					String auxParam;
+					String auxPath;
+					Method methodApiVariable;
 			
-		}else {
-			
-			List<String> fullPathVarialbeApiNameList = ObjectContainer.instance().getApiPathVariable(req.getMethod().toLowerCase()  + "-" + path.split("/").length );
-		 
-			if(fullPathVarialbeApiNameList != null && !fullPathVarialbeApiNameList.isEmpty()) {
-				//path variable
-				String[] arrayPath = path.split("/");
-				String[] arrayMethodPath;
-				Parameter[] parameters;
-				String auxParam;
-				String auxPath;
-				Method methodApiVariable;
-			
-				for (String fullPathVarialbeApiName : fullPathVarialbeApiNameList){
-					
-					apiControllerMethodInfo = ObjectContainer.instance().getApiControllerInfo(fullPathVarialbeApiName); 
-					
-					String[] controlllerMethod = apiControllerMethodInfo.split("-");
-					controller = ObjectContainer.instance().getController(controlllerMethod[0]);
-					methodApiVariable = ReflectionUtil.getMethodByNameAndHeritage(controller.getClass(), controlllerMethod[1], true);
-					
-					auxPath = fullPathVarialbeApiName;
-					arrayMethodPath = auxPath.split("/");
-					if(arrayPath.length == arrayMethodPath.length && methodApiVariable.getParameters().length >0) {
+					for (String fullPathVarialbeApiName : fullPathVarialbeApiNameList){
 						
-						pathParameter.clear();
-						parameters = methodApiVariable.getParameters();
-						 for (int i = 0; i < arrayMethodPath.length; i++) {
-							if(arrayMethodPath[i].contains("{")) {
-								auxParam = arrayMethodPath[i].replace("{","").replace("}","");
-								
-								for (Parameter parameter : parameters){
-									if(parameter.isAnnotationPresent(RequestParam.class) && 
-											parameter.getAnnotation(RequestParam.class).name().equalsIgnoreCase(auxParam)){  
-										auxPath = auxPath.replace("{" + auxParam + "}", arrayPath[i]);
-										pathParameter.put(auxParam, arrayPath[i]);
-									} 
+						apiControllerMethodInfo = ObjectContainer.instance().getApiControllerInfo(fullPathVarialbeApiName); 
+						
+						String[] controlllerMethod = apiControllerMethodInfo.split("-");
+						controller = ObjectContainer.instance().getController(controlllerMethod[0]);
+						methodApiVariable = ReflectionUtil.getMethodByNameAndHeritage(controller.getClass(), controlllerMethod[1], true);
+						
+						auxPath = fullPathVarialbeApiName;
+						arrayMethodPath = auxPath.split("/");
+						if(arrayPath.length == arrayMethodPath.length && methodApiVariable.getParameters().length >0) {
+							
+							pathParameter.clear();
+							parameters = methodApiVariable.getParameters();
+							 for (int i = 0; i < arrayMethodPath.length; i++) {
+								if(arrayMethodPath[i].contains("{")) {
+									auxParam = arrayMethodPath[i].replace("{","").replace("}","");
+									
+									for (Parameter parameter : parameters){
+										if(parameter.isAnnotationPresent(RequestParam.class) && 
+												parameter.getAnnotation(RequestParam.class).name().equalsIgnoreCase(auxParam)){  
+											auxPath = auxPath.replace("{" + auxParam + "}", arrayPath[i]);
+											pathParameter.put(auxParam, arrayPath[i]);
+										} 
+									}
 								}
 							}
+							if(auxPath.equalsIgnoreCase(path))
+									return execute(controller, methodApiVariable, pathParameter, req, resp);
+								 
 						}
-						if(auxPath.equalsIgnoreCase(path)) return execute(controller, methodApiVariable, pathParameter, req, resp);
 					}
 				}
 			}
+			throw new RequestProcessException("recurso no encontrado - " + req.getRequestURL().toString());
+		} catch (ResourceNotFoundException  | ResourcePermissionException e) {
+			throw new RequestProcessException(e);
+		  
 		}
-		throw new ResourceNotFoundException("recurso no encontrado - " + req.getRequestURL().toString());
 	}
 	
 	/**
@@ -157,14 +163,15 @@ public class MethodCaller
 	 * @throws ResourcePermissionException
 	 * @throws UnKnowProcessRequestException
 	 * @throws RequestProcessException
+	 * @throws InvocationException 
 	 * @throws ServletException
 	 * @throws ServiceException
 	 * @throws UIFilterToSearchConverterException
 	 */
 	protected Object execute(Object controller, Method method, Map<String, Object> pathParameter,
 						  HttpServletRequest req, HttpServletResponse resp) throws ResourceNotFoundException, ResourcePermissionException, 
-																UnKnowProcessRequestException, RequestProcessException, ServletException, ServiceException, UIFilterToSearchConverterException{ 
-		try {
+																RequestProcessException{ 
+		 
 			
 			checkAuthorizationPermission(controller, method);
  		
@@ -239,20 +246,28 @@ public class MethodCaller
 				}  
 			}
 			
-			return ReflectionUtil.invokeMethod(controller, method, paramValue); 
+			return invokeMethod(controller, method, paramValue); 
 			
-		} catch (InvocationException e){ 
-			
-			if(ObjectContainer.instance().containsException(e.getCause()))  
-				throw new RequestProcessException(e.getCause());
-			else
-				throw new UnKnowProcessRequestException(e.getMessage());
-			
-		}  catch (IOException | JsonException | ParseException e) 
-		{
-			throw new UnKnowProcessRequestException(e.getMessage());
-		}   
+ 
 	}
+	
+	private Object invokeMethod(Object ob, Method method,  Object[] args) throws RequestProcessException 
+	{
+		try {
+			return method.invoke(ob, args);
+		} catch (IllegalAccessException | IllegalArgumentException e) 
+		{
+			throw new RequestProcessException(e);
+		
+		}catch (InvocationTargetException inve)
+		{ 
+			if(inve.getTargetException() != null) {
+				throw new RequestProcessException(inve.getTargetException());
+			}else {
+				throw new RequestProcessException(inve);
+			} 
+		}
+	}	
 
 	private void checkAuthorizationPermission(Object controller, Method method) throws ResourcePermissionException {
 	  
